@@ -1,3 +1,17 @@
+## 4.13.13 (2026-05-29)
+
+
+### ✨ 更新内容
+
+* 支持职教云课堂作业测试 <a href="https://github.com/ocsjs/ocsjs/commit/862aff734fd4d5071439aa7908816b39de1dd022">></a>
+
+
+### ⚡ 优化提升
+
+* 添加题库连接失败解决方法 <a href="https://github.com/ocsjs/ocsjs/commit/53c01cb0947e343d7e72ec59fba4941601caad50">></a>
+
+
+
 ## 4.13.11 (2026-05-26)
 
 
