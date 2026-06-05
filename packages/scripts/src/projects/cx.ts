@@ -511,8 +511,7 @@ export const CXProject = Project.create({
 				['', 'mycourse/studentcourse'],
 				['', 'work/getAllWork'],
 				['', 'work/doHomeWorkNew'],
-				['', 'exam/test\\?'],
-				['', 'mooc-ans/mycourse/studentstudy']
+				['', 'exam/test\\?']
 			],
 			hideInPanel: true,
 			async oncomplete() {
