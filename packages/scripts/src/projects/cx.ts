@@ -765,24 +765,33 @@ function workOrExam(
 
 	// 处理作业和考试题目的方法
 	const workOrExamQuestionTitleTransform = (titles: (HTMLElement | undefined)[]) => {
+		// 是否为多个小题的题目
+		const is_multiple_question = titles.length > 1;
 		const optimizationTitle = titles
-			.map((titleElement) => {
-				if (titleElement) {
-					const titleCloneEl = titleElement.cloneNode(true) as HTMLElement;
+			.map((el, i) => {
+				if (el) {
+					const titleCloneEl = el.cloneNode(true) as HTMLElement;
 					const childNodes = titleCloneEl.childNodes;
-					// 删除序号
-					childNodes[0].remove();
-					// 删除题型
-					childNodes[0].remove();
+					// 一般多小题题目只有第一个 title 存在题型文本
+					if (i === 0) {
+						// 删除序号
+						childNodes[0]?.remove();
+						// 删除题型
+						childNodes[0]?.remove();
+					}
 					// 显示图片链接在题目中
 					return optimizationElementWithImage(titleCloneEl, true).innerText;
 				}
 				return '';
 			})
-			.join(',');
+			.join('\n');
 
 		return removeRedundantWords(
-			StringUtils.of(optimizationTitle).nowrap(' ').nospace().toString().trim(),
+			StringUtils.of(optimizationTitle)
+				.nowrap(is_multiple_question ? '\n' : ' ')
+				.nospace()
+				.toString()
+				.trim(),
 			redundanceWordsText.split('\n')
 		);
 	};
@@ -791,14 +800,10 @@ function workOrExam(
 	const worker = new OCSWorker({
 		root: '.questionLi',
 		elements: {
-			title: [
-				/** 题目标题 */
-				(root) => $el('h3', root) as HTMLElement
-				// /** 连线题第一组 */
-				// (root) => $el('.line_wid_half.fl', root),
-				// /** 连线题第二组 */
-				// (root) => $el('.line_wid_half.fr', root)
-			],
+			title: (root) =>
+				$$el([':scope > h3', ':scope > div:not(.stem_answer)', ':scope > p'].join(','), root).filter(
+					(e) => !!e.textContent.trim()
+				),
 			options: '.answerBg .answer_p, .textDIV, .eidtDiv',
 			type: type === 'exam' ? 'input[name^="type"]' : 'input[id^="answertype"]',
 			lineAnswerInput: '.line_answer input[name^=answer]',
