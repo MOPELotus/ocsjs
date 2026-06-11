@@ -1,8 +1,7 @@
 name: Build and Publish
 
 on:
-  release:
-    types: [released]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,7 +10,10 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Use Node.js 18.x
         uses: actions/setup-node@v4
@@ -64,7 +66,12 @@ jobs:
         with:
           tag: ${{ env.VERSION }}
           artifactContentType: "html/text"
-          artifacts: "./release/ocs.user.js,./release/ocs.common.user.js,./release/core.js,./release/index.js,./CHANGELOG_SIMPLIFIED.md"
+          artifacts: |
+            ./release/ocs.user.js
+            ./release/ocs.common.user.js
+            ./release/core.js
+            ./release/index.js
+            ./CHANGELOG_SIMPLIFIED.md
           bodyFile: "./release_body.txt"
           allowUpdates: true
 
