@@ -19,25 +19,30 @@ export async function waitForMedia(options?: {
 	timeout?: number;
 	filter?: (video: HTMLVideoElement | HTMLAudioElement) => boolean;
 }) {
-	const res = await Promise.race([
-		new Promise<HTMLVideoElement | HTMLAudioElement>((resolve, reject) => {
-			const interval = setInterval(() => {
-				const video = (options?.root || document).querySelector<HTMLVideoElement | HTMLAudioElement>(
-					`${options?.videoSelector || 'video'},${options?.audioSelector || 'audio'}`
-				);
-				if (video && (!options?.filter || options.filter(video))) {
-					clearInterval(interval);
-					resolve(video);
+	const timeoutMs = options?.timeout ?? 3 * 60 * 1000;
+
+	const res = await new Promise<HTMLVideoElement | HTMLAudioElement>((resolve, reject) => {
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+		const interval = setInterval(() => {
+			const video = (options?.root || document).querySelector<HTMLVideoElement | HTMLAudioElement>(
+				`${options?.videoSelector || 'video'},${options?.audioSelector || 'audio'}`
+			);
+			if (video && (!options?.filter || options.filter(video))) {
+				clearInterval(interval);
+				if (timeoutId !== undefined) {
+					clearTimeout(timeoutId);
 				}
-			}, 200);
-		}),
-		$.sleep(options?.timeout ?? 3 * 60 * 1000)
-	]);
-	if (res) {
-		return res;
-	} else {
-		throw new Error('视频/音频未找到，或者加载超时。');
-	}
+				resolve(video);
+			}
+		}, 200);
+
+		timeoutId = setTimeout(() => {
+			clearInterval(interval);
+			reject(new Error('视频/音频未找到，或者加载超时。'));
+		}, timeoutMs);
+	});
+
+	return res;
 }
 
 export function waitForElement(
