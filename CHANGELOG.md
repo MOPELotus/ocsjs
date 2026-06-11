@@ -9,6 +9,13 @@
 
 
 
+## [4.13.24](https://github.com/ocsjs/ocsjs/compare/v4.13.23...v4.13.24) (2026-06-11)
+
+
+### Bug Fixes
+
+* 持续优化脚本CI自动化发布流程 ([8257215](https://github.com/ocsjs/ocsjs/commit/82572156d6ad893665d75e25eae3e4947907d4c3))
+
 ## [4.13.23](https://github.com/ocsjs/ocsjs/compare/4.13.22...v4.13.23) (2026-06-11)
 
 
