@@ -9,6 +9,20 @@
 
 
 
+## [4.13.23](https://github.com/ocsjs/ocsjs/compare/4.13.22...v4.13.23) (2026-06-11)
+
+
+### Bug Fixes
+
+* **script:** 修复 waitForMedia 中 setInterval 内存泄漏 ([ed06b88](https://github.com/ocsjs/ocsjs/commit/ed06b88c435e0983eaf518a467f97f6aba93c00f))
+* **script:** 修复 waitForMedia 中 setInterval 内存泄漏 ([4e03fef](https://github.com/ocsjs/ocsjs/commit/4e03fef846be858495ee8baf57490e89252509c9))
+* 优化脚本CI自动化发布流程 ([0ee2537](https://github.com/ocsjs/ocsjs/commit/0ee25376e010743c347e10873c03213335e3aeff))
+
+
+### Performance Improvements
+
+* 优化脚本CI自动化发布流程 ([ab907ef](https://github.com/ocsjs/ocsjs/commit/ab907ef4382a650d9f7fc8b09bb41fa868682215))
+
 ## [4.13.19](https://github.com/ocsjs/ocsjs/compare/4.13.16...4.13.19) (2026-06-04)
 
 
@@ -3343,6 +3357,3 @@
 * **web:** 添加重命名功能，添加目录展开记录保存，添加帮助页面 ([0b90cc2](https://github.com/ocsjs/ocsjs/commit/0b90cc20d33c21b406b7d6426df812aed03eec1c))
 * **web:** 文件编辑，文件拓展 ([9f2f4fb](https://github.com/ocsjs/ocsjs/commit/9f2f4fb6b4fd37b7526239bacf45135ff5874cbc))
 * **web:** 支持文件（夹）拖拽放置，文件（夹）的创建，删除 ([705cc21](https://github.com/ocsjs/ocsjs/commit/705cc210bf382a3a92962f03526366edc0e18398))
-
-
-
