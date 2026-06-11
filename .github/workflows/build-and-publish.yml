@@ -1,0 +1,74 @@
+name: Build and Publish
+
+on:
+  release:
+    types: [released]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup env
+        run: |
+          echo 'BUILD_PATH="../release"' > ./scripts/.env
+          echo 'VITE_BUILD_PATH="../../release"' > ./packages/core/.env
+          echo 'VITE_BUILD_PATH="../../release"' > ./packages/scripts/.env
+          echo "BUILDTIME=$(TZ=Asia/Shanghai date)" >> $GITHUB_ENV
+          echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+          echo "DOWNLOAD_URL=https://github.com/ocsjs/ocsjs/releases/download/${GITHUB_REF_NAME}/" >> $GITHUB_ENV
+
+      - name: Install Dependencies
+        run: |
+          npm install pnpm -g
+          pnpm install -w
+          cd packages/scripts && pnpm install && cd ../../
+          npm run tsc
+
+      - name: Build ocs scripts
+        run: npm run build
+
+      - name: Generate simplified changelog
+        run: npm run changelog:simplify
+
+      - name: Build release body
+        run: |
+          cat > release_body.txt << EOF
+          ${{ github.event.release.body }}
+
+          ## 资源下载列表
+
+          - [用户脚本](${{ env.DOWNLOAD_URL }}ocs.user.js)
+          - [用户脚本(全域名通用版)](${{ env.DOWNLOAD_URL }}ocs.common.user.js)
+          - [核心库](${{ env.DOWNLOAD_URL }}core.js)
+          - [简洁更新日志](${{ env.DOWNLOAD_URL }}CHANGELOG_SIMPLIFIED.md)
+
+          ### 快捷访问
+          - [官网](https://docs.ocsjs.com/)
+
+          Created at ${{ env.BUILDTIME }}.
+          EOF
+
+      - name: Update release with artifacts
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ env.VERSION }}
+          artifactContentType: "html/text"
+          artifacts: "./release/ocs.user.js,./release/ocs.common.user.js,./release/core.js,./release/index.js,./CHANGELOG_SIMPLIFIED.md"
+          bodyFile: "./release_body.txt"
+          allowUpdates: true
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
