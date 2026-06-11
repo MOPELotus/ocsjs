@@ -619,6 +619,10 @@ function workAndExam(
 							return;
 						}
 						if (uploadable) {
+							// 先收起面板防止阻挡，元素无法通过移动脚本面板去点击
+							CommonProject.scripts.render.methods.minimize();
+							CommonProject.scripts.render.methods.setPosition(100, 200);
+
 							const sumbit = document.querySelector('.j-submit');
 							if (sumbit) {
 								await rp.click(sumbit);
