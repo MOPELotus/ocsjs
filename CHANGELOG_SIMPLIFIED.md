@@ -1,3 +1,14 @@
+## 4.13.22 (2026-06-11)
+
+
+### 🔧 修复内容
+
+* 修复超星答题时无法读取多行题目的问题 <a href="https://github.com/ocsjs/ocsjs/commit/338fbfc6e4bb9d41ea70e06e0eeba14130b4cf73">></a>
+* 修复超星路径 mooc-ans/mycourse/studentstudy 跳转新版后404的问题 <a href="https://github.com/ocsjs/ocsjs/commit/d2137ed0a4a5211b54e539a277cb0c933f47ace5">></a>
+* 修复中国大学MOOC无法提交视频内测验的问题 <a href="https://github.com/ocsjs/ocsjs/commit/621c6122c3de43909dc61a0515aaf5c86418582b">></a>
+
+
+
 ## 4.13.19 (2026-06-04)
 
 

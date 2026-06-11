@@ -802,7 +802,7 @@ function workOrExam(
 		elements: {
 			title: (root) =>
 				$$el([':scope > h3', ':scope > div:not(.stem_answer)', ':scope > p'].join(','), root).filter(
-					(e) => !!e.textContent.trim()
+					(e) => !!e.textContent?.trim()
 				),
 			options: '.answerBg .answer_p, .textDIV, .eidtDiv',
 			type: type === 'exam' ? 'input[name^="type"]' : 'input[id^="answertype"]',
