@@ -2340,7 +2340,10 @@ export const ZHSProject = Project.create({
 			}
 		}),
 		'hike-homework': new Script({
-			matches: [['AI教学中心-题目作业', '/stu/answer-homework']],
+			matches: [
+				['AI教学中心-题目作业', '/stu/answer-homework'],
+				['AI教学中心-作业任务页面', '/stu-exam/answer-exam']
+			],
 			name: '✍️ 教学空间-AI智慧课程-题目作业脚本',
 			namespace: 'zhs.hike.homework',
 			configs: {
@@ -3457,7 +3460,7 @@ function hikeHomework(
 		root: '.question-item',
 		elements: {
 			type: '.title-box,.combination-title',
-			title: '.qeustion-content > span, .combination-content > span',
+			title: '.qeustion-content , .combination-content ',
 			options: '.option-item, .vditor-content'
 		},
 		thread: thread ?? 1,
