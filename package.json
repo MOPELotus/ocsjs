@@ -17,7 +17,8 @@
 		"release": "sh ./scripts/release.sh",
 		"pub:minor": "npm version minor && pnpm build:core && npm publish",
 		"pub:major": "npm version major && pnpm build:core && npm publish",
-		"changelog:simplify": "gulp -f ./scripts/simplify_changelog.js"
+		"changelog:simplify": "gulp -f ./scripts/simplify_changelog.js",
+		"test": "tsx tests/resolver.test.ts"
 	},
 	"devDependencies": {
 		"@html-eslint/eslint-plugin": "^0.15.0",
@@ -39,6 +40,7 @@
 		"gulp-cli": "^2.3.0",
 		"gulp-zip": "^5.1.0",
 		"prettier": "^2.6.2",
+		"tsx": "^4.22.4",
 		"typescript": "^4.5.5"
 	},
 	"repository": {

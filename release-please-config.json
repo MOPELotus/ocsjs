@@ -43,11 +43,5 @@
 			"section": "Tests",
 			"hidden": true
 		}
-	],
-	"packages": {
-		".": {
-			"component": "",
-			"release-type": "node"
-		}
-	}
+	]
 }
