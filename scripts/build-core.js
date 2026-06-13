@@ -4,6 +4,7 @@ const { series } = require('gulp');
 const del = require('del');
 const util = require('util');
 const { version } = require('../package.json');
+/** @type {(...args: any[])=> Promise<void>} */
 const execOut = util.promisify(require('./utils').execOut);
 const { createUserScript } = require('../packages/utils');
 const path = require('path');
@@ -20,14 +21,14 @@ function cleanOutput() {
 	return del([distPath, '../lib'], { force: true });
 }
 
+async function testResolver() {
+	await execOut('tsx ../tests/resolver.test.ts');
+}
+
 async function buildPackages() {
-	// @ts-ignore
 	await execOut('tsc', { cwd: '../packages/core' });
-	// @ts-ignore
 	await execOut('vite build', { cwd: '../packages/core' });
-	// @ts-ignore
 	await execOut('tsc', { cwd: '../packages/scripts' });
-	// @ts-ignore
 	await execOut('vite build', { cwd: '../packages/scripts' });
 }
 
@@ -145,4 +146,4 @@ async function createUserJs() {
 	await createUserScript(commonOpts);
 }
 
-exports.default = series(cleanOutput, buildPackages, createUserJs);
+exports.default = series(cleanOutput, testResolver, buildPackages, createUserJs);

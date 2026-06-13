@@ -37,6 +37,9 @@ jobs:
           cd packages/scripts && pnpm install && cd ../../
           npm run tsc
 
+      - name: Run tests
+        run: pnpm test
+
       - name: Build ocs scripts
         run: npm run build
 
