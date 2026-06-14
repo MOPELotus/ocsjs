@@ -1581,6 +1581,11 @@ export const ZHSProject = Project.create({
 			],
 			namespace: 'zhs.xnk.work',
 			configs: { notes: workNotes },
+			onhistorychanged(type) {
+				if (type === 'pushed') {
+					this.oncomplete?.();
+				}
+			},
 			async oncomplete() {
 				commonWork(this, {
 					workerProvider: xnkWork
@@ -2783,7 +2788,8 @@ function xnkWork({ answererWrappers, period, thread, answerSeparators, answerMat
 	let resolvedCount = 0;
 
 	const worker = new OCSWorker({
-		root: '.questionBox',
+		// .questionBox 有两个同样的，这里选择具有直接子元素questionContent的div元素，保证题目唯一
+		root: 'div:has(> .questionContent)' /** .questionBox */,
 		elements: {
 			title: '.questionContent',
 			options: '.optionUl label',
