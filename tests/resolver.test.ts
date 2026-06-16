@@ -22,42 +22,36 @@ const cases = _cases as Cases;
 // ========== JSON 类型声明 ==========
 
 interface SingleCase {
-	q: string;
 	a: string;
 	opts: string[];
 	expect: string;
 }
 
 interface MultipleCase {
-	q: string;
 	a: string;
 	opts: string[];
 	expect: string;
 }
 
 interface MultipleABCDCase {
-	q: string;
 	a: string;
 	opts: string[];
 	expect: string;
 }
 
 interface DisambiguationCase {
-	q: string;
 	a: string;
 	opts: string[];
 	expect: string;
 }
 
 interface JudgementCase {
-	q: string;
 	a: string;
 	opts: string[];
 	expect: string;
 }
 
 interface CompletionCase {
-	q: string;
 	a: string;
 	blanks: number;
 	expect: string;
@@ -82,27 +76,17 @@ const filter = process.argv.includes('--filter')
 
 function section(title: string) {
 	if (filter && !title.toLowerCase().includes(filter)) return false;
-	console.log(`\n${'─'.repeat(60)}`);
-	console.log(`  ${title}`);
-	console.log('─'.repeat(60));
+	console.log(`\n  ${title}`);
 	return true;
 }
 
-function ok(actual: unknown, expected: unknown, label: string) {
-	const isOk = actual === expected;
-	if (isOk) pass++;
-	else fail++;
-	console.log(
-		`    ${isOk ? '✅' : '❌'} ${label}: ${JSON.stringify(actual)}${isOk ? '' : ` (期望 ${JSON.stringify(expected)})`}`
-	);
-}
-
-/** 分号分隔的期望字符串 → 期望数组 */
-function splitExpect(s: string) {
-	return s
-		.split(';')
-		.map((o) => o.trim())
-		.filter(Boolean);
+function ok(actual: string, expected: string, info: string) {
+	if (actual === expected) {
+		pass++;
+	} else {
+		fail++;
+		console.log(`    ❌ ${info}  结果=${JSON.stringify(actual)}`);
+	}
 }
 
 /** 使用 answerSimilar 自动计算相似度评分，并过滤掉 ≤0.6 的选项（与 resolver pipeline 一致） */
@@ -121,20 +105,21 @@ function computeRatings(answer: string, options: string[]): { opts: string[]; ra
 	return { opts, ratings };
 }
 
+function fmtOptCtx(c: { a: string; opts: string[] }) {
+	return `答案=${JSON.stringify(c.a)}  选项=${JSON.stringify(c.opts)}`;
+}
+
+function fmtBlankCtx(c: { a: string; blanks: number }) {
+	return `答案=${JSON.stringify(c.a)}  填空数=${c.blanks}`;
+}
+
 // ========== 单选题 ==========
 
 if (section('单选题')) {
 	for (const c of cases.single) {
-		console.log(`\n  题目：${c.q}`);
-		console.log(`  答案：${c.a}`);
-		console.log(`  选项：${c.opts.join('  ')}`);
 		const r = resolveSingle(c.a.split(';'), c.opts);
-		if (c.expect) {
-			ok(r.finish, true, '匹配成功');
-			ok(r.option, c.expect, `选中「${c.expect}」`);
-		} else {
-			ok(r.finish, false, '匹配失败');
-		}
+		const actual = r.finish ? r.option ?? '' : '';
+		ok(actual, c.expect, fmtOptCtx(c));
 	}
 }
 
@@ -142,33 +127,16 @@ if (section('单选题')) {
 
 if (section('多选题')) {
 	for (const c of cases.multiple) {
-		console.log(`\n  题目：${c.q}`);
-		console.log(`  答案：${c.a}`);
-		console.log(`  选项：${c.opts.join('  ')}`);
-		const expected = splitExpect(c.expect);
 		const r = resolveMultiple([c.a], c.opts);
-		ok(r.finish, true, '匹配成功');
-		for (const e of expected) {
-			ok(r.options?.includes(e), true, `包含「${e}」`);
-		}
-		for (const o of c.opts) {
-			if (!expected.includes(o)) {
-				ok(r.options?.includes(o), false, `不含「${o}」`);
-			}
-		}
+		const actual = r.finish ? (r.options ?? []).join(';') : '';
+		ok(actual, c.expect, fmtOptCtx(c));
 	}
 
 	// ABCD 兜底
 	for (const c of cases.multipleABCD) {
-		console.log(`\n  题目：${c.q}`);
-		console.log(`  答案：${c.a}`);
-		console.log(`  选项：${c.opts.join('  ')}`);
 		const r = resolveMultiple([c.a], c.opts);
-		ok(r.finish, true, '匹配成功');
-		const expected = splitExpect(c.expect);
-		for (const e of expected) {
-			ok(r.plainOptions?.includes(e), true, `包含「${e}」`);
-		}
+		const actual = r.finish ? (r.plainOptions ?? []).join(';') : '';
+		ok(actual, c.expect, fmtOptCtx(c));
 	}
 }
 
@@ -176,17 +144,9 @@ if (section('多选题')) {
 
 if (section('消歧')) {
 	for (const c of cases.disambiguation) {
-		console.log(`\n  题目：${c.q}`);
-		console.log(`  答案：${c.a}`);
-		console.log(`  选项：${c.opts.join('  ')}`);
-		const expected = splitExpect(c.expect);
 		const { opts: filteredOpts, ratings } = computeRatings(c.a, c.opts);
-		console.log(`  评分：${ratings.map((r) => r.toFixed(2)).join('  ')}`);
 		const r = disambiguateSimilarOptions(filteredOpts, ratings);
-		ok(r.length, expected.length, `保留 ${expected.length} 项`);
-		for (const e of expected) {
-			ok(r.includes(e), true, `包含「${e}」`);
-		}
+		ok(r.join(';'), c.expect, fmtOptCtx(c));
 	}
 }
 
@@ -194,12 +154,9 @@ if (section('消歧')) {
 
 if (section('判断题')) {
 	for (const c of cases.judgement) {
-		console.log(`\n  题目：${c.q}`);
-		console.log(`  答案：${c.a}`);
-		console.log(`  选项：${c.opts.join('  ')}`);
 		const r = resolveJudgement([[c.a]], c.opts);
-		ok(r.finish, true, '匹配成功');
-		ok(r.option, c.expect, `选中「${c.expect}」`);
+		const actual = r.finish ? r.option ?? '' : '';
+		ok(actual, c.expect, fmtOptCtx(c));
 	}
 }
 
@@ -207,30 +164,17 @@ if (section('判断题')) {
 
 if (section('填空题')) {
 	for (const c of cases.completion) {
-		console.log(`\n  题目：${c.q}`);
-		console.log(`  答案：${c.a}`);
-		console.log(`  填空数：${c.blanks}`);
-		const expected = splitExpect(c.expect);
 		const r = resolveCompletion(
 			c.a.split(' / ').map((s) => [s.trim()]),
 			c.blanks
 		);
-		if (expected.length) {
-			ok(r.finish, true, '匹配成功');
-			ok(r.answers?.length, expected.length, `填入 ${expected.length} 项`);
-			for (let i = 0; i < expected.length; i++) {
-				ok(r.answers?.[i], expected[i], `第${i + 1}项为「${expected[i]}」`);
-			}
-		} else {
-			ok(r.finish, false, '匹配失败');
-		}
+		const actual = r.finish ? (r.answers ?? []).join(';') : '';
+		ok(actual, c.expect, fmtBlankCtx(c));
 	}
 }
 
 // ========== 结果 ==========
 
-console.log(`\n${'═'.repeat(60)}`);
-console.log(`  ✅ ${pass} 通过   ❌ ${fail} 失败   共 ${pass + fail} 项`);
-console.log('═'.repeat(60));
+console.log(`\n  ✅ ${pass} 通过   ❌ ${fail} 失败   共 ${pass + fail} 项\n`);
 
 if (fail > 0) process.exit(1);
