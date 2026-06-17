@@ -9,6 +9,31 @@
 
 
 
+## [4.14.1](https://github.com/ocsjs/ocsjs/compare/4.14.0...4.14.1) (2026-06-17)
+
+
+### 🐛 Bug Fixes
+
+* **core:** 修复答案匹配算法选择多余选项导致错题 ([7dcaeb0](https://github.com/ocsjs/ocsjs/commit/7dcaeb029cb9866ad1bd9b6a9a7904a926bc1f1d)), closes [#222](https://github.com/ocsjs/ocsjs/issues/222)
+* **script:** 修复智慧树校内课考试重复搜题的BUG ([0e0e02c](https://github.com/ocsjs/ocsjs/commit/0e0e02c533d5b06fee1b89c6660f09f8ddf53b58))
+* **script:** 修复超星非预览模式题目错乱的BUG ([c65d6a5](https://github.com/ocsjs/ocsjs/commit/c65d6a53b2a13ee72d32704bd33f39bc785f9417))
+* **script:** 适配智慧树AI教学中心考试功能 ([0decae5](https://github.com/ocsjs/ocsjs/commit/0decae5480cf8522b4eeba08646eb2695ded6a2b))
+* 修复CI自动化发布流程无法识别版本号的BUG ([731fd99](https://github.com/ocsjs/ocsjs/commit/731fd99c2fa73ecce3d78bca9566713dc3c9677f))
+* 修复ESlint代码检查报错 ([7c60bc1](https://github.com/ocsjs/ocsjs/commit/7c60bc101fe91254aaa22855be78feec684c6b7c))
+* 持续优化脚本CI自动化发布流程 ([1566c31](https://github.com/ocsjs/ocsjs/commit/1566c313170922eae88c56518bbb3020a6f10ca9))
+
+
+### ⚡ Performance
+
+* **script:** 支持单选题中出现的判断选项，直接判定为判断题进行回答 ([42de2cf](https://github.com/ocsjs/ocsjs/commit/42de2cf3a66108ee7340cfa190a86b053b489c95))
+* **script:** 添加长江雨课堂手机版跳转电脑版功能 ([2b455d3](https://github.com/ocsjs/ocsjs/commit/2b455d30e36e67f83395985a37ea28233ef69c56))
+* **script:** 添加随机答题设置仅支持超星章节测试的提示 ([3b9e135](https://github.com/ocsjs/ocsjs/commit/3b9e1351bb1620a5e09ecc92a7a73b6017fd5812))
+* **script:** 移除答案匹配模式设置 ([66d8e8b](https://github.com/ocsjs/ocsjs/commit/66d8e8ba28c8a283aa44a40fb57edaff9b6c61f5))
+* 优化CI自动发布流程 ([68d378f](https://github.com/ocsjs/ocsjs/commit/68d378f80698916ec68ae30dae51ef62ead033e0))
+* 优化使用教程文案，优化开关按钮样式 ([8b3d3c7](https://github.com/ocsjs/ocsjs/commit/8b3d3c7d01876bb5bf7cccb0be79d073257533de))
+* 添加答案匹配模式的测试用例 ([927351f](https://github.com/ocsjs/ocsjs/commit/927351fb233f20fe46202ee31661c33954c087ab))
+* 添加雨课堂到面板首页支持列表中 ([3180fb9](https://github.com/ocsjs/ocsjs/commit/3180fb90c901094aa95b0cafb7e4ffa6dbad3b6f))
+
 ## [4.14.0](https://github.com/ocsjs/ocsjs/compare/ocsjs-v4.13.24...ocsjs-v4.14.0) (2026-06-11)
 
 
