@@ -77,8 +77,3 @@ jobs:
             ./CHANGELOG_SIMPLIFIED.md
           bodyFile: "./release_body.txt"
           allowUpdates: true
-
-      - name: Publish to npm
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
