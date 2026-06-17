@@ -1,10 +1,5 @@
 import { splitAnswer, resolvePlainAnswer } from '../utils';
-import {
-	removeRedundant,
-	answerNormalizedMatch,
-	answerSimilarWithGap,
-	normalizeString
-} from '../../utils/string';
+import { removeRedundant, answerNormalizedMatch, answerSimilarWithGap, normalizeString } from '../../utils/string';
 import { findBestMatch } from 'string-similarity';
 import { StringUtils } from '../../../utils/string';
 
@@ -50,16 +45,23 @@ export function resolveMultiple(
 		const answers = splitAnswer(resultAnswers[i].trim(), separators);
 
 		// 阶段1: 归一化匹配（包含式）
-		const normalizedGroup: MultipleMatchGroup = { options: [], answers: [], ratings: [], similarSum: 0, similarCount: 0 };
+		const normalizedGroup: MultipleMatchGroup = {
+			options: [],
+			answers: [],
+			ratings: [],
+			similarSum: 0,
+			similarCount: 0
+		};
 		const normalizedOptions = answerNormalizedMatch(answers, optionStrings);
 		for (const opt of normalizedOptions) {
 			const idx = options.indexOf(opt);
 			if (idx !== -1) {
-				const matchedAns = answers.find((a) => {
-					const na = normalizeString(removeRedundant(a));
-					const no = normalizeString(removeRedundant(opt));
-					return na === no || na.includes(no) || no.includes(na);
-				}) || opt;
+				const matchedAns =
+					answers.find((a) => {
+						const na = normalizeString(removeRedundant(a));
+						const no = normalizeString(removeRedundant(opt));
+						return na === no || na.includes(no) || no.includes(na);
+					}) || opt;
 				normalizedGroup.options.push(opt);
 				normalizedGroup.answers.push(matchedAns);
 				// 归一化匹配中，答案与选项完全归一化相等的评分更高

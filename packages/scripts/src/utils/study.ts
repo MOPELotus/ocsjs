@@ -1,5 +1,3 @@
-import { $ } from '@ocsjs/core';
-
 /**
  * 等待视频加载并获取视频
  */
@@ -22,7 +20,8 @@ export async function waitForMedia(options?: {
 	const timeoutMs = options?.timeout ?? 3 * 60 * 1000;
 
 	const res = await new Promise<HTMLVideoElement | HTMLAudioElement>((resolve, reject) => {
-		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+		// eslint-disable-next-line prefer-const
+		let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
 		const interval = setInterval(() => {
 			const video = (options?.root || document).querySelector<HTMLVideoElement | HTMLAudioElement>(
 				`${options?.videoSelector || 'video'},${options?.audioSelector || 'audio'}`

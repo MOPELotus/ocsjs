@@ -21,7 +21,7 @@ export function normalizeString(str: string): string {
 	return clearString(
 		str
 			.replace(/[，。！？；：""''、（）【】《》\s]/g, '') // 去除中文标点和空白
-			.replace(/[,.\-!?;:'"()\[\]<>]/g, '') // 去除英文标点
+			.replace(/[,.\-!?;:'"()[\]<>]/g, '') // 去除英文标点
 			.replace(/[ａ-ｚＡ-Ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)) // 全角→半角
 			.replace(/％/g, '%')
 	);

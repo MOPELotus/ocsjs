@@ -23,11 +23,7 @@ export interface SingleResolveResult {
  * @param options   选项文本列表
  * @param separators 答案分隔符
  */
-export function resolveSingle(
-	answers: string[],
-	options: string[],
-	separators?: string[]
-): SingleResolveResult {
+export function resolveSingle(answers: string[], options: string[], separators?: string[]): SingleResolveResult {
 	const allAnswer = answers.map((a) => splitAnswer(a, separators)).flat();
 	const optionStrings = options.map(removeRedundant);
 

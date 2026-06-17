@@ -1,4 +1,4 @@
-import { $, AnswerMatchMode, AnswererWrapper, WorkUploadType } from '@ocsjs/core';
+import { $, AnswererWrapper, WorkUploadType } from '@ocsjs/core';
 import { $ui, $message, $modal, MessageElement, h } from 'easy-us';
 import { $console } from '../projects/background';
 import { answerWrapperEmptyWarning } from './work';
