@@ -574,17 +574,6 @@ export const CommonProject = Project.create({
 						});
 					}
 				},
-				answerMatchMode: {
-					showIf: 'common.settings.advancedSettings',
-					elementClassName: 'config-details',
-					label: '答案匹配模式',
-					tag: 'select',
-					defaultValue: 'similar' as AnswerMatchMode,
-					options: [
-						['similar', '相似匹配', '答案相似度达到60%以上就匹配'],
-						['exact', '精确匹配', '答案必须完全一致才匹配']
-					]
-				},
 				redundanceWordsText: {
 					showIf: 'common.settings.advancedSettings',
 					elementClassName: 'config-details',

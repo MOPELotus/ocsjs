@@ -879,8 +879,7 @@ async function singleQuestionHandle({
 }) {
 	if (!type) throw new Error('未识别题目类型，无法作答');
 
-	const { answererWrappers, answerMatchMode, answerSeparators } =
-		CommonProject.scripts.settings.methods.getWorkOptions();
+	const { answererWrappers, answerSeparators } = CommonProject.scripts.settings.methods.getWorkOptions();
 
 	if (answererWrappers === undefined || answererWrappers.length === 0) {
 		await answerWrapperEmptyWarning(0);
@@ -909,7 +908,6 @@ async function singleQuestionHandle({
 
 	const ctx: WorkContext<any> = {
 		searchInfos: searchedInfos,
-		answerMatchMode,
 		answerSeparators: answerSeparators.split(','),
 		type: type,
 		root: document.body,
@@ -1078,7 +1076,6 @@ async function handleCommonUnitTest(
 		},
 		thread: opts.thread ?? 1,
 		answerSeparators: opts.answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: opts.answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: async (elements, ctx) => {
 			const title = titleTransform(elements.title);

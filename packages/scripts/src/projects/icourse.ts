@@ -473,14 +473,7 @@ function waitForQuestion() {
 function workAndExam(
 	rp: RemotePage,
 	type: 'chapter-test' | 'work' | 'exam',
-	{
-		answererWrappers,
-		redundanceWordsText,
-		upload,
-		stopSecondWhenFinish,
-		answerSeparators,
-		answerMatchMode
-	}: CommonWorkOptions
+	{ answererWrappers, redundanceWordsText, upload, stopSecondWhenFinish, answerSeparators }: CommonWorkOptions
 ) {
 	CommonProject.scripts.workResults.methods.init({
 		questionPositionSyncHandlerType: 'icourse'
@@ -516,7 +509,6 @@ function workAndExam(
 		},
 		thread: 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(elements.title);

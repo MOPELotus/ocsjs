@@ -12,7 +12,6 @@ export interface CommonWorkOptions {
 	stopSecondWhenFinish: number;
 	redundanceWordsText: string;
 	answerSeparators: string;
-	answerMatchMode: AnswerMatchMode;
 }
 
 /** 创建答题预处理信息 */

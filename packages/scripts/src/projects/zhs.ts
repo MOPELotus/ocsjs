@@ -2585,15 +2585,7 @@ function getPopupCaptcha() {
  */
 function gxkWorkAndExam(
 	workInfo: any,
-	{
-		answererWrappers,
-		period,
-		thread,
-		stopSecondWhenFinish,
-		redundanceWordsText,
-		answerSeparators,
-		answerMatchMode
-	}: CommonWorkOptions
+	{ answererWrappers, period, thread, stopSecondWhenFinish, redundanceWordsText, answerSeparators }: CommonWorkOptions
 ) {
 	CommonProject.scripts.workResults.methods.init({
 		questionPositionSyncHandlerType: 'zhs-gxk'
@@ -2642,7 +2634,6 @@ function gxkWorkAndExam(
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(undefined, request_index++);
@@ -2770,7 +2761,7 @@ function gxkWorkAndExam(
 /**
  * 校内学分课的作业
  */
-function xnkWork({ answererWrappers, period, thread, answerSeparators, answerMatchMode }: CommonWorkOptions) {
+function xnkWork({ answererWrappers, period, thread, answerSeparators }: CommonWorkOptions) {
 	$message.info({ content: '开始作业' });
 
 	CommonProject.scripts.workResults.methods.init();
@@ -2797,7 +2788,6 @@ function xnkWork({ answererWrappers, period, thread, answerSeparators, answerMat
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(elements.title);
@@ -2884,7 +2874,7 @@ function xnkWork({ answererWrappers, period, thread, answerSeparators, answerMat
  */
 function smartWork(
 	remotePage: RemotePage | undefined,
-	{ answererWrappers, period, thread, answerSeparators, answerMatchMode }: CommonWorkOptions
+	{ answererWrappers, period, thread, answerSeparators }: CommonWorkOptions
 ) {
 	$message.info({ content: '开始作业' });
 	$message.warn({
@@ -2915,7 +2905,6 @@ function smartWork(
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(elements.title);
@@ -3045,7 +3034,7 @@ function smartWork(
 
 function smartExam(
 	remotePage: RemotePage | undefined,
-	{ answererWrappers, period, thread, answerSeparators, answerMatchMode }: CommonWorkOptions
+	{ answererWrappers, period, thread, answerSeparators }: CommonWorkOptions
 ) {
 	$message.info({ content: '开始作业' });
 	$message.warn({
@@ -3077,7 +3066,6 @@ function smartExam(
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(elements.title);
@@ -3195,7 +3183,7 @@ function smartExam(
 
 function fusioncourseWork(
 	remotePage: RemotePage | undefined,
-	{ answererWrappers, period, thread, answerSeparators, answerMatchMode }: CommonWorkOptions
+	{ answererWrappers, period, thread, answerSeparators }: CommonWorkOptions
 ) {
 	$message.info({ content: '开始作业' });
 
@@ -3219,7 +3207,6 @@ function fusioncourseWork(
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(elements.title);
@@ -3317,7 +3304,7 @@ function fusioncourseWork(
 
 function hikeWork(
 	remotePage: RemotePage | undefined,
-	{ answererWrappers, period, thread, answerSeparators, answerMatchMode }: CommonWorkOptions
+	{ answererWrappers, period, thread, answerSeparators }: CommonWorkOptions
 ) {
 	$message.info({ content: '开始作业' });
 
@@ -3341,7 +3328,6 @@ function hikeWork(
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(elements.title);
@@ -3447,7 +3433,7 @@ function hikeWork(
 
 function hikeHomework(
 	remotePage: RemotePage | undefined,
-	{ answererWrappers, period, thread, answerSeparators, answerMatchMode }: CommonWorkOptions
+	{ answererWrappers, period, thread, answerSeparators }: CommonWorkOptions
 ) {
 	$message.info({ content: '开始作业' });
 
@@ -3471,7 +3457,6 @@ function hikeHomework(
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			const title = titleTransform(elements.title);

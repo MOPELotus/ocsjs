@@ -748,7 +748,6 @@ function workOrExam(
 		thread,
 		redundanceWordsText,
 		answerSeparators,
-		answerMatchMode,
 		preview_mode
 	}: CommonWorkOptions & {
 		// 整卷预览模式
@@ -1808,8 +1807,7 @@ const JobRunner = {
 			thread,
 			stopSecondWhenFinish,
 			redundanceWordsText,
-			answerSeparators,
-			answerMatchMode
+			answerSeparators
 		}: CommonWorkOptions
 	) {
 		if (answererWrappers === undefined || answererWrappers.length === 0) {
@@ -1871,7 +1869,6 @@ const JobRunner = {
 			},
 			thread: thread ?? 1,
 			answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-			answerMatchMode: answerMatchMode,
 			/** 默认搜题方法构造器 */
 			answerer: (elements, ctx) => {
 				const title = chapterTestTaskQuestionTitleTransform(elements.title);
