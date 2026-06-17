@@ -9,6 +9,13 @@
 
 
 
+## [4.14.2](https://github.com/ocsjs/ocsjs/compare/4.14.1...4.14.2) (2026-06-17)
+
+
+### 🐛 Bug Fixes
+
+* 移除CI自动发布到NPM的步骤 ([5cd0f3c](https://github.com/ocsjs/ocsjs/commit/5cd0f3c15cceec1d49c35216e75ef7fe1f246dc7))
+
 ## [4.14.1](https://github.com/ocsjs/ocsjs/compare/4.14.0...4.14.1) (2026-06-17)
 
 
