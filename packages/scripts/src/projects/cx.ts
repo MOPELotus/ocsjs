@@ -795,14 +795,24 @@ function workOrExam(
 		);
 	};
 
+	// 这里跟章节测试的连线题不一样，章节测试是新版连线题
 	/** 新建答题器 */
 	const worker = new OCSWorker({
 		root: '.questionLi',
 		elements: {
 			title: (root) =>
-				$$el([':scope > h3', ':scope > div:not(.stem_answer)', ':scope > p'].join(','), root).filter(
-					(e) => !!e.textContent?.trim()
-				),
+				$$el(
+					// 非预览模式的样式跟正常的不一样
+					!preview_mode
+						? ['.splitS-left .mark_name', '.line_wid_half.fl,.line_wid_half.fr'].join(',')
+						: [
+								':scope > h3',
+								':scope > div:not(.stem_answer)',
+								':scope > p',
+								'.line_wid_half.fl,.line_wid_half.fr'
+						  ].join(','),
+					root
+				).filter((e) => !!e.textContent?.trim()),
 			options: '.answerBg .answer_p, .textDIV, .eidtDiv',
 			type: type === 'exam' ? 'input[name^="type"]' : 'input[id^="answertype"]',
 			lineAnswerInput: '.line_answer input[name^=answer]',
@@ -814,7 +824,6 @@ function workOrExam(
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
-		answerMatchMode: answerMatchMode,
 		/** 默认搜题方法构造器 */
 		answerer: (elements, ctx) => {
 			if (elements.title) {
@@ -843,8 +852,12 @@ function workOrExam(
 
 		work: async (ctx) => {
 			const { elements, searchInfos } = ctx;
-			const typeInput = elements.type[0] as HTMLInputElement;
-			const type = getQuestionType(parseInt(typeInput.value));
+
+			// 在非预览模式下会出现多个干扰项 type，这里提取正确的
+
+			const type = getQuestionType(
+				parseInt(elements.type.find((t) => t.getAttribute('name')?.match(/type\d+/))?.getAttribute('value') || '-1')
+			);
 
 			if (type && (type === 'completion' || type === 'multiple' || type === 'judgement' || type === 'single')) {
 				const resolver = createDefaultQuestionResolver(ctx)[type];
@@ -883,7 +896,11 @@ function workOrExam(
 					if (ans.length === 1) {
 						ans = splitAnswer(ans[0]);
 					}
-					if (ans.filter(Boolean).length !== 0 && elements.lineAnswerInput) {
+					if (
+						ans.filter(Boolean).length !== 0 &&
+						elements.lineAnswerInput &&
+						ans.filter(Boolean).length === elements.lineSelectBox.length
+					) {
 						//  选择答案
 						for (let index = 0; index < elements.lineSelectBox.length; index++) {
 							const box = elements.lineSelectBox[index];
@@ -954,7 +971,8 @@ function workOrExam(
 		(async () => {
 			while (next && worker.isClose === false) {
 				await worker.doWork({ enable_debug: BackgroundProject.scripts.dev.cfg.enable_answerer_debug });
-				await $.sleep(1000);
+				$message.info({ content: '已完成，即将下一题', duration: 0 });
+				await $.sleep(3000);
 				next = getNextBtn();
 				next?.click();
 				await $.sleep(1000);
