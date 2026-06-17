@@ -9,8 +9,8 @@ import {
 	AnswerWrapperHandlerConfig
 } from '@ocsjs/core';
 import { $message, h, $gm, $store, Project, Script, $modal, StoreListenerType, $ui } from 'easy-us';
-import type { AnswerMatchMode, AnswererWrapper, SearchInformation } from '@ocsjs/core';
-import { CXProject, ICourseProject, IcveMoocProject, ZHSProject, ZJYProject } from '../index';
+import type { AnswererWrapper, SearchInformation } from '@ocsjs/core';
+import { CXProject, ICourseProject, IcveMoocProject, YKTProject, ZHSProject, ZJYProject } from '../index';
 import { markdown } from '../utils/markdown';
 import { enableCopy } from '../utils';
 import { SearchInfosElement } from '../elements/search.infos';
@@ -99,7 +99,6 @@ export const CommonProject = Project.create({
 			},
 			onrender({ panel }) {
 				const guide = createGuide();
-				guide.style.width = '480px';
 				panel.body.replaceChildren(guide);
 			}
 		}),
@@ -1803,7 +1802,7 @@ const createGuide = () => {
 			]),
 
 			h('div', [
-				...[CXProject, ZHSProject, ZJYProject, IcveMoocProject, ICourseProject].map((project) => {
+				...[CXProject, ZHSProject, ZJYProject, IcveMoocProject, ICourseProject, YKTProject].map((project) => {
 					const btn = h('button', { className: 'base-style-button-secondary', style: { margin: '4px' } }, [
 						project.name
 					]);
