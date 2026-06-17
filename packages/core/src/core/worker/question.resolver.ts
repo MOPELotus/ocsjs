@@ -1,5 +1,5 @@
 import { QuestionResolver, WorkContext } from './interface';
-import { resolveSingle, resolveMultiple, resolveJudgement, resolveCompletion } from './resolvers';
+import { resolveSingle, resolveMultiple, resolveJudgement, resolveCompletion, isJudgementOptions } from './resolvers';
 
 /** 默认答案题目处理器 */
 export function createDefaultQuestionResolver<E>(
@@ -12,10 +12,21 @@ export function createDefaultQuestionResolver<E>(
 		 * 委托给 resolveSingle 纯函数，将 DOM 元素适配为字符串
 		 */
 		async single(infos, options, handler) {
-			const answers = infos
-				.map((info) => info.results.map((res) => res.answer))
-				.flat();
 			const optionTexts = options.map((o) => o.innerText);
+
+			// 选项具备判断题性质时，直接走判断题处理逻辑
+			if (isJudgementOptions(optionTexts.map((o) => o.trim()))) {
+				const answerGroups = infos.map((info) => info.results.map((res) => res.answer));
+				const result = resolveJudgement(answerGroups, optionTexts);
+				if (result.finish && result.option !== undefined) {
+					const index = optionTexts.indexOf(result.option);
+					const opt = index !== -1 ? options[index] : options[0];
+					await handler('judgement', result.option, opt, ctx);
+				}
+				return result;
+			}
+
+			const answers = infos.map((info) => info.results.map((res) => res.answer)).flat();
 
 			const result = resolveSingle(answers, optionTexts, ctx.answerSeparators);
 
@@ -33,9 +44,7 @@ export function createDefaultQuestionResolver<E>(
 		 * 委托给 resolveMultiple 纯函数，将 DOM 元素适配为字符串
 		 */
 		async multiple(infos, options, handler) {
-			const resultAnswers = infos
-				.map((info) => info.results.map((res) => res.answer))
-				.flat();
+			const resultAnswers = infos.map((info) => info.results.map((res) => res.answer)).flat();
 			const optionTexts = options.map((o) => o.innerText);
 
 			const result = resolveMultiple(resultAnswers, optionTexts, ctx.answerSeparators);

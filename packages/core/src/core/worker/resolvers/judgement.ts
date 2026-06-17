@@ -67,3 +67,11 @@ function matches(target: string, words: string[]) {
 		(word) => clearString(removeRedundant(word), '√', '×') === clearString(removeRedundant(target), '√', '×')
 	);
 }
+
+/** 检测选项是否为判断题性质（仅有两个选项，且分别为"对"和"错"性质） */
+export function isJudgementOptions(options: string[]): boolean {
+	if (options.length !== 2) return false;
+	const hasCorrect = options.some((opt) => matches(opt, CORRECT_WORDS));
+	const hasIncorrect = options.some((opt) => matches(opt, INCORRECT_WORDS));
+	return hasCorrect && hasIncorrect;
+}
