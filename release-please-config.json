@@ -11,43 +11,34 @@
 	},
 	"changelog-sections": [
 		{
-			"type": "feat",
-			"section": "✨ Features"
+			"type": "feat"
 		},
 		{
-			"type": "fix",
-			"section": "🐛 Bug Fixes"
+			"type": "fix"
 		},
 		{
-			"type": "perf",
-			"section": "⚡ Performance"
+			"type": "perf"
 		},
 		{
-			"type": "docs",
-			"section": "📝 Documentation"
+			"type": "docs"
 		},
 		{
-			"type": "refactor",
-			"section": "♻️ Refactoring"
+			"type": "refactor"
 		},
 		{
 			"type": "chore",
-			"section": "🔧 Miscellaneous",
 			"hidden": true
 		},
 		{
 			"type": "ci",
-			"section": "🔧 Miscellaneous",
 			"hidden": true
 		},
 		{
 			"type": "test",
-			"section": "🔧 Miscellaneous",
 			"hidden": true
 		},
 		{
 			"type": "style",
-			"section": "🔧 Miscellaneous",
 			"hidden": true
 		}
 	]

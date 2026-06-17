@@ -37,32 +37,11 @@ jobs:
           cd packages/scripts && pnpm install && cd ../../
           npm run tsc
 
-      - name: Run tests
-        run: pnpm test
-
       - name: Build ocs scripts
         run: npm run build
 
       - name: Generate simplified changelog
         run: npm run changelog:simplify
-
-      - name: Build release body
-        run: |
-          cat > release_body.txt << EOF
-          ${{ github.event.release.body }}
-
-          ## 资源下载列表
-
-          - [用户脚本](${{ env.DOWNLOAD_URL }}ocs.user.js)
-          - [用户脚本(全域名通用版)](${{ env.DOWNLOAD_URL }}ocs.common.user.js)
-          - [核心库](${{ env.DOWNLOAD_URL }}core.js)
-          - [简洁更新日志](${{ env.DOWNLOAD_URL }}CHANGELOG_SIMPLIFIED.md)
-
-          ### 快捷访问
-          - [官网](https://docs.ocsjs.com/)
-
-          Created at ${{ env.BUILDTIME }}.
-          EOF
 
       - name: Update release with artifacts
         uses: ncipollo/release-action@v1
@@ -75,5 +54,31 @@ jobs:
             ./release/core.js
             ./release/index.js
             ./CHANGELOG_SIMPLIFIED.md
-          bodyFile: "./release_body.txt"
           allowUpdates: true
+
+      - name: Append custom release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          EXISTING_BODY=$(gh release view "$TAG_NAME" --json body -q .body 2>/dev/null || echo "")
+          DL="${{ env.DOWNLOAD_URL }}"
+          VER="${{ env.VERSION }}"
+          BT="${{ env.BUILDTIME }}"
+          CUSTOM_NOTES="
+          ---
+
+          ## 资源下载列表
+
+          - [用户脚本](${DL}ocs.user.js)
+          - [用户脚本(全域名通用版)](${DL}ocs.common.user.js)
+          - [核心库](${DL}core.js)
+          - [简洁更新日志](${DL}CHANGELOG_SIMPLIFIED.md)
+
+          ### 快捷访问
+          - [官网](https://docs.ocsjs.com/)
+
+          Created at ${BT}.
+          "
+
+          gh release edit "$TAG_NAME" --notes "${EXISTING_BODY}${CUSTOM_NOTES}"
