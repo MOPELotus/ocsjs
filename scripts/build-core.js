@@ -6,7 +6,7 @@ const util = require('util');
 const { version } = require('../package.json');
 /** @type {(...args: any[])=> Promise<void>} */
 const execOut = util.promisify(require('./utils').execOut);
-const { createUserScript } = require('../packages/utils');
+const { createUserScript, createMetaFile } = require('../packages/utils');
 const path = require('path');
 const dotenv = require('dotenv');
 const fs = require('fs');
@@ -115,6 +115,8 @@ async function createUserJs() {
 	const officialOpts = createOptions();
 	console.log('CreateUserScript: ', officialOpts.metadata.name, officialOpts.dist);
 	await createUserScript(officialOpts);
+	console.log('createMetaFile: ', path.join(distResolvedPath, 'ocs.meta.js'));
+	await createMetaFile({ dist: officialOpts.dist, metaDist: path.join(distResolvedPath, 'ocs.meta.js') });
 
 	/** 创建调试脚本 */
 	const devOpts = createOptions();

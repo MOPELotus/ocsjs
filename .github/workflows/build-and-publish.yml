@@ -50,6 +50,7 @@ jobs:
           artifactContentType: "html/text"
           artifacts: |
             ./release/ocs.user.js
+            ./release/ocs.meta.js
             ./release/ocs.common.user.js
             ./release/core.js
             ./release/index.js
@@ -74,6 +75,7 @@ jobs:
           - [用户脚本(全域名通用版)](${DL}ocs.common.user.js)
           - [核心库](${DL}core.js)
           - [简洁更新日志](${DL}CHANGELOG_SIMPLIFIED.md)
+          - [META](${DL}ocs.meta.js)
 
           ### 快捷访问
           - [官网](https://docs.ocsjs.com/)
