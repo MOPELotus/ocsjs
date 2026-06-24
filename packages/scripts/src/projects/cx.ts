@@ -831,13 +831,14 @@ function workOrExam(
 				const title = workOrExamQuestionTitleTransform(elements.title);
 				if (title) {
 					const typeInput = elements.type[0] as HTMLInputElement;
+					const type = (typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined) || 'unknown';
 					return CommonProject.scripts.apps.methods.searchAnswerInCaches(title, async () => {
 						await $.sleep((period ?? 3) * 1000);
 						return defaultAnswerWrapperHandler(answererWrappers, {
-							type: (typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined) || 'unknown',
+							type,
 							title,
 							options:
-								ctx.type === 'completion'
+								type === 'completion'
 									? ''
 									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText).join('\n')
 						});
@@ -1892,14 +1893,15 @@ const JobRunner = {
 				const title = chapterTestTaskQuestionTitleTransform(elements.title);
 				if (title) {
 					const typeInput = elements.type[0] as HTMLInputElement;
+					const type = (typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined) || 'unknown';
 
 					return CommonProject.scripts.apps.methods.searchAnswerInCaches(title, async () => {
 						await $.sleep((period ?? 3) * 1000);
 						return defaultAnswerWrapperHandler(answererWrappers, {
-							type: (typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined) || 'unknown',
+							type,
 							title,
 							options:
-								ctx.type === 'completion'
+								type === 'completion'
 									? ''
 									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText).join('\n')
 						});
