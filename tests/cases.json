@@ -11,6 +11,16 @@
       "expect": "计算机网络"
     },
     {
+      "a": "16M",
+      "opts": [
+        "16MB",
+        "16M",
+        "32M",
+        "32MB"
+      ],
+      "expect": "16M"
+    },
+    {
       "a": "hello world",
       "opts": [
         "hello, world!",
