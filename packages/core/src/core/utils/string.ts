@@ -38,8 +38,22 @@ export function answerNormalizedMatch(answers: string[], options: string[]): str
 
 	return _answers.length !== 0
 		? _options
-				.map((opt, i) => ({ opt, original: options[i] }))
-				.filter(({ opt }) => _answers.some((ans) => ans === opt || opt.includes(ans) || ans.includes(opt)))
+				.map((opt, i) => {
+					let level = 0;
+					if (opt) {
+						for (const ans of _answers) {
+							if (ans === opt) {
+								level = 2;
+								break;
+							} else if (opt.includes(ans) || ans.includes(opt)) {
+								level = 1;
+							}
+						}
+					}
+					return { opt, original: options[i], level };
+				})
+				.filter(({ level }) => level > 0)
+				.sort((a, b) => b.level - a.level)
 				.map(({ original }) => original)
 		: [];
 }
