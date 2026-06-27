@@ -219,9 +219,14 @@ export const CXProject = Project.create({
 					],
 					defaultValue: 'next' as 'next' | 'job' | 'manually'
 				},
+				autoJumpToUnFinishJob: {
+					label: '自动切换未完成章节',
+					attrs: { type: 'checkbox', title: '在自动学习前寻找未完成章节并跳转（积分课、智慧课程：推荐关闭）' },
+					defaultValue: true
+				},
 				restudy: {
 					label: '复习模式',
-					attrs: { title: '已经完成的视频继续学习，并从当前的章节往下开始学习', type: 'checkbox' },
+					attrs: { title: '已经完成的视频继续学习', type: 'checkbox' },
 					defaultValue: false
 				},
 				forceLearn: {
@@ -662,24 +667,21 @@ export const CXProject = Project.create({
 			namespace: 'cx.new.study-dispatcher',
 			hideInPanel: true,
 			async oncomplete() {
-				// 开始任务切换
-				const restudy = CXProject.scripts.study.cfg.restudy;
-
 				CommonProject.scripts.render.methods.pin(CXProject.scripts.study);
 
 				let chapters = await CXAnalyses.waitForChapterInfos();
 
-				if (!restudy) {
-					// 如果不是复习模式，则寻找需要运行的任务
-					const params = new URLSearchParams(window.location.href);
-					const mooc = params.get('mooc2');
-					/** 切换新版 */
-					if (mooc === null) {
-						params.set('mooc2', '1');
-						window.location.replace(decodeURIComponent(params.toString()));
-						return;
-					}
+				const params = new URLSearchParams(window.location.href);
+				const mooc = params.get('mooc2');
+				/** 切换新版 */
+				if (mooc === null) {
+					params.set('mooc2', '1');
+					window.location.replace(decodeURIComponent(params.toString()));
+					return;
+				}
 
+				// 寻找需要运行的任务
+				if (CXProject.scripts.study.cfg.autoJumpToUnFinishJob) {
 					// 过滤掉已完成的章节
 					chapters = chapters.filter((chapter) => chapter.unFinishCount !== 0);
 
@@ -689,23 +691,17 @@ export const CXProject = Project.create({
 						const params = new URLSearchParams(window.location.href);
 						const courseId = params.get('courseId');
 						const classId = params.get('clazzid');
-						setTimeout(() => {
-							//  进入需要进行的章节，并且当前章节未被选中
-							if ($$el(`.posCatalog_active[id="cur${chapters[0].chapterId}"]`).length === 0) {
-								$gm.unsafeWindow.getTeacherAjax(courseId, classId, chapters[0].chapterId);
-								// 自动滚动
-								setTimeout(() => {
-									CXAnalyses.scrollToActiveChapter();
-								}, 1000);
-							}
-						}, 1000);
+						//  进入需要进行的章节，并且当前章节未被选中
+						if ($$el(`.posCatalog_active[id="cur${chapters[0].chapterId}"]`).length === 0) {
+							$gm.unsafeWindow.getTeacherAjax(courseId, classId, chapters[0].chapterId);
+						}
+						await $.sleep(1000);
 					}
-				} else {
-					// 自动滚动
-					setTimeout(() => {
-						CXAnalyses.scrollToActiveChapter();
-					}, 1000);
 				}
+
+				// 自动滚动
+				await $.sleep(1000);
+				CXAnalyses.scrollToActiveChapter();
 			}
 		}),
 		cxSecretFontRecognize: new Script({
