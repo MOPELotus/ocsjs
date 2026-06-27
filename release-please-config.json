@@ -2,6 +2,7 @@
 	"release-type": "node",
 	"include-component-in-tag": false,
 	"include-v-in-tag": false,
+	"separate-pull-requests": true,
 	"skip-parse-errors": true,
 	"packages": {
 		".": {
