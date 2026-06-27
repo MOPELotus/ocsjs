@@ -9,6 +9,15 @@
 
 
 
+## [4.14.4](https://github.com/ocsjs/ocsjs/compare/4.14.3...4.14.4) (2026-06-25)
+
+
+* **core:** 优化单选题匹配算法，优先选择精确匹配项 ([10c300f](https://github.com/ocsjs/ocsjs/commit/10c300f1264ecb4f7a22ca8e756b2b56016aac82))
+* **core:** 优化单选题匹配算法，优先选择精确匹配项 ([9f5dfd2](https://github.com/ocsjs/ocsjs/commit/9f5dfd20656316b8e1a70893e10924938a42b083))
+* **script:** 修复超星考试类型填空题选项搜索出现大量未知代码 ([edff881](https://github.com/ocsjs/ocsjs/commit/edff881cecc25a2705edceab46e09f3b54a515ad))
+* 修改Github错误报告和功能建议界面 ([9f85e3a](https://github.com/ocsjs/ocsjs/commit/9f85e3a1b3de6a15b84910e954defd33aace9b8c))
+* 添加metajs脚本元信息文件打包以便更新 ([c2aba7f](https://github.com/ocsjs/ocsjs/commit/c2aba7fc90c9cf3c3e2fc8602b8824b4e73d04fc))
+
 ## [4.14.3](https://github.com/ocsjs/ocsjs/compare/4.14.2...4.14.3) (2026-06-17)
 
 
