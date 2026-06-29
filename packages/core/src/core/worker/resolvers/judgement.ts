@@ -55,7 +55,7 @@ export function resolveJudgement(answerGroups: string[][], options: string[]): J
 				}
 			}
 
-			return { finish: true };
+			return { finish: false };
 		}
 	}
 
