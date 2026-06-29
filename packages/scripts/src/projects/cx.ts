@@ -115,7 +115,9 @@ export const CXProject = Project.create({
 		'jxgmxy.com',
 		'jnzyjsxy.cn',
 		// 超星学习通PPT，2025下半年更新的PTT图书新域名
-		'sslibrary.com'
+		'sslibrary.com',
+		// 26年新增官方域名
+		'xuexi365.com'
 	],
 	scripts: {
 		/**
