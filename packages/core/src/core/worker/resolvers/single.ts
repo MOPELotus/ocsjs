@@ -1,4 +1,4 @@
-import { splitAnswer } from '../utils';
+import { splitAnswer, resolvePlainAnswer } from '../utils';
 import { removeRedundant, answerNormalizedMatch, answerSimilar } from '../../utils/string';
 import { StringUtils } from '../../../utils/string';
 
@@ -58,8 +58,9 @@ export function resolveSingle(answers: string[], options: string[], separators?:
 
 	// ========== 阶段3: 纯ABCD答案兜底 ==========
 	for (const answer of allAnswer) {
-		const ans = StringUtils.nowrap(answer, '').trim();
-		if (ans.length === 1 && /[A-Z]/.test(ans)) {
+		const ans = resolvePlainAnswer(StringUtils.nowrap(answer, '').trim());
+		// 单选仅允许单字母答案（多字母视为多选答案，不在此处理）
+		if (ans && ans.length === 1) {
 			const index = ans.charCodeAt(0) - 65;
 			if (optionStrings[index] !== undefined) {
 				return { finish: true, option: options[index] };
