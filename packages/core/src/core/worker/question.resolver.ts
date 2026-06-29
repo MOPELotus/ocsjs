@@ -49,8 +49,11 @@ export function createDefaultQuestionResolver<E>(
 
 			const result = resolveMultiple(resultAnswers, optionTexts, ctx.answerSeparators);
 
-			if (result.finish && result.options) {
-				for (const optText of result.options) {
+			// 纯 ABCD 答案兜底走 plainOptions，普通匹配走 options
+			const resolvedOptions = result.finish ? result.options ?? result.plainOptions : undefined;
+
+			if (result.finish && resolvedOptions) {
+				for (const optText of resolvedOptions) {
 					const index = optionTexts.indexOf(optText);
 					const opt = index !== -1 ? options[index] : options[0];
 					await handler('multiple', optText, opt, ctx);
