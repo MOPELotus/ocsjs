@@ -3062,7 +3062,7 @@ function smartExam(
 		elements: {
 			type: 'div.flex.items-center.mb-\\[16px\\]',
 			title: 'div.flex-1 .mb-\\[32px\\] .text-mainText.font-medium',
-			options: 'label.user-select.group'
+			options: 'label.user-select.group,div.real-editor'
 		},
 		thread: thread ?? 1,
 		answerSeparators: answerSeparators.split(',').map((s) => s.trim()),
@@ -3085,13 +3085,13 @@ function smartExam(
 		work: {
 			type(ctx) {
 				const type = ctx.elements.type[0].textContent;
-				if (type?.includes('单选题')) {
+				if (type?.includes('单选')) {
 					return 'single';
 				} else if (type?.includes('多选题')) {
 					return 'multiple';
-				} else if (type?.includes('判断题')) {
+				} else if (type?.includes('判断')) {
 					return 'judgement';
-				} else if (type?.includes('填空')) {
+				} else if (type?.includes('填空') || type?.includes('问答')) {
 					return 'completion';
 				} else {
 					return undefined;
@@ -3109,6 +3109,21 @@ function smartExam(
 						}
 						await $.sleep(200);
 					}
+				} else if (type === 'completion') {
+					// 简答
+					if (option.classList.contains('real-editor')) {
+						// @ts-ignore
+						option.ckeditorInstance.data.set(answer);
+					} else {
+						const input = option.querySelector<HTMLInputElement>('input');
+						if (input) {
+							input.value = answer;
+							Reflect.set(input, 'composition', true);
+							input.dispatchEvent(new Event('input', { bubbles: true }));
+						}
+					}
+
+					await $.sleep(200);
 				}
 			}
 		},
