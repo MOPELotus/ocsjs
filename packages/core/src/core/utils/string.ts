@@ -31,6 +31,9 @@ export function normalizeString(str: string): string {
  * 归一化精确匹配模式
  * 对答案和选项进行归一化处理后精确比对
  * 解决"多一个标点符号就匹配不上"的问题
+ *
+ * 方向说明（与 resolveMultiple 保持一致）：仅取"答案⊇选项"或相等，不取"选项⊇答案"，
+ * 避免 "TCP" 误选 "TCP/IP协议"、"相对论" 误选 "爱因斯坦的相对论" 等语义不一致的选项。
  */
 export function answerNormalizedMatch(answers: string[], options: string[]): string[] {
 	const _answers = answers.map(removeRedundant).map(normalizeString);
@@ -45,7 +48,7 @@ export function answerNormalizedMatch(answers: string[], options: string[]): str
 							if (ans === opt) {
 								level = 2;
 								break;
-							} else if (opt.includes(ans) || ans.includes(opt)) {
+							} else if (ans.includes(opt)) {
 								level = 1;
 							}
 						}
