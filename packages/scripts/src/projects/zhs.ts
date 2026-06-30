@@ -1467,6 +1467,13 @@ export const ZHSProject = Project.create({
 						// 检查是否为软件环境
 						CommonProject.scripts.render.methods.pin(this);
 						await waitForElement('.question-area-content');
+
+						// 考完后的试卷预览
+						if (document.querySelector('[mode="REVIEW_MODE"]')) {
+							$message.info('当前试卷状态已完成、脚本将停止运行。');
+							return;
+						}
+
 						commonWork(this, {
 							workerProvider: (opts) => {
 								return smartExam(undefined, opts);
