@@ -23,8 +23,9 @@ export interface MultipleResolveResult {
 /**
  * 多选题匹配算法（自适应）
  *
- * 三阶段自动匹配，无需手动选择模式：
- * 1. 归一化匹配 — 去除标点/空格差异后，答案包含选项或选项包含答案即匹配
+ * 两阶段自动匹配，无需手动选择模式：
+ * 1. 归一化匹配（单向 答案⊇选项）— 去除标点/空格差异后，仅当答案包含选项（或相等）才视为命中；
+ *    不取"选项包含答案"方向，避免 "TCP" 误选 "TCP/IP协议" 等语义不一致的选项
  * 2. 相似匹配 + 领先度消歧 — 候选选项两两比较，文本相似时只保留匹配度更高的
  * 3. 纯ABCD答案兜底
  *
@@ -56,12 +57,14 @@ export function resolveMultiple(
 		for (const opt of normalizedOptions) {
 			const idx = options.indexOf(opt);
 			if (idx !== -1) {
-				const matchedAns =
-					answers.find((a) => {
-						const na = normalizeString(removeRedundant(a));
-						const no = normalizeString(removeRedundant(opt));
-						return na === no || na.includes(no) || no.includes(na);
-					}) || opt;
+				// 严格方向：仅当 答案⊇选项（或归一化相等）时才视为命中，
+				// 避免 "TCP" 误选 "TCP/IP协议" 等选项⊇答案的误匹配
+				const matchedAns = answers.find((a) => {
+					const na = normalizeString(removeRedundant(a));
+					const no = normalizeString(removeRedundant(opt));
+					return na === no || na.includes(no);
+				});
+				if (!matchedAns) continue;
 				normalizedGroup.options.push(opt);
 				normalizedGroup.answers.push(matchedAns);
 				// 归一化匹配中，答案与选项完全归一化相等的评分更高
@@ -81,19 +84,6 @@ export function resolveMultiple(
 		normalizedGroup.ratings = normalizedKeptIndices.map((idx) => normalizedGroup.ratings[idx]);
 		normalizedGroup.similarCount = normalizedGroup.options.length;
 		normalizedGroup.similarSum = normalizedGroup.ratings.reduce((a, b) => a + b, 0);
-
-		// 全包含匹配
-		const matchGroup: MultipleMatchGroup = { options: [], answers: [], ratings: [], similarSum: 0, similarCount: 0 };
-		for (let j = 0; j < options.length; j++) {
-			const ans = answers.find((a) => a.includes(removeRedundant(options[j])));
-			if (ans) {
-				matchGroup.options.push(options[j]);
-				matchGroup.answers.push(ans);
-				matchGroup.ratings.push(1);
-				matchGroup.similarSum += 1;
-				matchGroup.similarCount += 1;
-			}
-		}
 
 		// 相似度匹配
 		const ratingGroup: MultipleMatchGroup = { options: [], answers: [], ratings: [], similarSum: 0, similarCount: 0 };
@@ -118,7 +108,7 @@ export function resolveMultiple(
 		ratingGroup.similarSum = ratingGroup.ratings.reduce((a, b) => a + b, 0);
 
 		// 选匹配度最高的
-		const best = [normalizedGroup, matchGroup, ratingGroup].sort(
+		const best = [normalizedGroup, ratingGroup].sort(
 			(a, b) => b.similarCount * 100 + b.similarSum - a.similarCount * 100 - a.similarSum
 		)[0];
 		groups[i] = best;
@@ -129,7 +119,7 @@ export function resolveMultiple(
 		.sort((a, b) => {
 			const bsc = b.similarCount * 100;
 			const asc = a.similarCount * 100;
-			return bsc + b.similarSum - asc + a.similarSum;
+			return bsc + b.similarSum - asc - a.similarSum;
 		});
 
 	if (sorted[0]) {
@@ -151,7 +141,7 @@ export function resolveMultiple(
 	}
 
 	if (plainOptions.length) {
-		return { finish: true, plainOptions };
+		return { finish: true, plainOptions: [...new Set(plainOptions)] };
 	}
 
 	return { finish: false };
