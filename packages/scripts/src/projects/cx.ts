@@ -805,7 +805,7 @@ function workOrExam(
 						? ['.splitS-left .mark_name', '.line_wid_half.fl,.line_wid_half.fr'].join(',')
 						: [
 								':scope > h3',
-								':scope > div:not(.stem_answer)',
+								':scope > div:not(.stem_answer,.mark_answer)',
 								':scope > p',
 								'.line_wid_half.fl,.line_wid_half.fr'
 						  ].join(','),
