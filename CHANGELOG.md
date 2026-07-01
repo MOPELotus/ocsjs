@@ -9,6 +9,12 @@
 
 
 
+## [4.15.1](https://github.com/ocsjs/ocsjs/compare/4.15.0...4.15.1) (2026-07-01)
+
+
+* **core:** 修复build报错：Unnecessary escape character: \ ([76f959b](https://github.com/ocsjs/ocsjs/commit/76f959b8fecd02f4b16937c0f9ad35629683140e))
+* **core:** 修复tooltip提示在移动至滑动开关圆形按钮时不显示的BUG ([d43243b](https://github.com/ocsjs/ocsjs/commit/d43243bd7dab013801e7654fc46f7185c211ef7b))
+
 ## [4.15.0](https://github.com/ocsjs/ocsjs/compare/4.14.8...4.15.0) (2026-07-01)
 
 
