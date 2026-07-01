@@ -9,6 +9,11 @@
 
 
 
+## [4.15.3](https://github.com/ocsjs/ocsjs/compare/4.15.2...4.15.3) (2026-07-01)
+
+
+* **script:** 修复超星作业答题时搜题会附带“我的答案”的BUG ([d314886](https://github.com/ocsjs/ocsjs/commit/d314886649e2d100c51d7529497a93c881db930e))
+
 ## [4.15.2](https://github.com/ocsjs/ocsjs/compare/4.15.1...4.15.2) (2026-07-01)
 
 
