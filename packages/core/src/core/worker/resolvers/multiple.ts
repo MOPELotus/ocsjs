@@ -55,7 +55,9 @@ export function resolveMultiple(
 		};
 		const normalizedOptions = answerNormalizedMatch(answers, optionStrings);
 		for (const opt of normalizedOptions) {
-			const idx = options.indexOf(opt);
+			// answerNormalizedMatch 返回的是 optionStrings（已 removeRedundant）中的字符串，
+			// 故在 optionStrings 中定位索引，再映射回原始 options，避免前缀剥离后查找不到
+			const idx = optionStrings.indexOf(opt);
 			if (idx !== -1) {
 				// 严格方向：仅当 答案⊇选项（或归一化相等）时才视为命中，
 				// 避免 "TCP" 误选 "TCP/IP协议" 等选项⊇答案的误匹配
@@ -65,7 +67,7 @@ export function resolveMultiple(
 					return na === no || na.includes(no);
 				});
 				if (!matchedAns) continue;
-				normalizedGroup.options.push(opt);
+				normalizedGroup.options.push(options[idx]);
 				normalizedGroup.answers.push(matchedAns);
 				// 归一化匹配中，答案与选项完全归一化相等的评分更高
 				const na = normalizeString(removeRedundant(matchedAns));
