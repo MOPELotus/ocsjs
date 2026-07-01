@@ -47,7 +47,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ env.VERSION }}
-          artifactContentType: "html/text"
+          artifactContentType: "text/html"
           artifacts: |
             ./release/ocs.user.js
             ./release/ocs.meta.js
@@ -56,6 +56,10 @@ jobs:
             ./release/index.js
             ./CHANGELOG_SIMPLIFIED.md
           allowUpdates: true
+          # 上传产物时保留 release-please 已写入的 changelog body，
+          # 否则 ncipollo 会用空 body 覆盖，导致后续追加点拨时 changelog 丢失
+          omitBodyDuringUpdate: true
+          omitNameDuringUpdate: true
 
       - name: Append custom release notes
         env:
