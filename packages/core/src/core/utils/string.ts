@@ -163,7 +163,17 @@ export function answerExactMatch(answers: string[], options: string[]): string[]
 
 /**
  * 删除题目选项中开头的冗余字符串
+ *
+ * 两条规则依次执行：
+ * 1. `A.` / `A、` / `A)` 等带分隔符的选项标签：字母 + 分隔符 + 内容
+ * 2. `A选项` / `C男女平等` 等字母直接紧跟中文的标签：字母 + 中文内容
+ *    （仅当字母后紧跟中文时剥离，故 "TCP协议"、"CPU" 等字母串不被误删）
  */
 export function removeRedundant(str: string) {
-	return str?.trim().replace(/^[A-Z]{1}[^A-Za-z0-9⺀-鿿]+([A-Za-z0-9⺀-鿿]+)/, '$1') || '';
+	return (
+		str
+			?.trim()
+			.replace(/^[A-Z]{1}[^A-Za-z0-9⺀-鿿]+([A-Za-z0-9⺀-鿿]+)/, '$1')
+			.replace(/^[A-Z]{1}([⺀-鿿][A-Za-z0-9⺀-鿿]*)/, '$1') || ''
+	);
 }
