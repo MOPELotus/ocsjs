@@ -54,7 +54,7 @@ export function isPlainAnswer(answer: string) {
 export function resolvePlainAnswer(answer: string) {
 	const resolve = answer
 		.trim()
-		.replace(/[,，\.。．、 #]/g, '')
+		.replace(/[,，.。．、 #]/g, '')
 		.trim();
 	if (isPlainAnswer(resolve)) {
 		return resolve;
