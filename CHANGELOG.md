@@ -9,6 +9,11 @@
 
 
 
+## [4.15.2](https://github.com/ocsjs/ocsjs/compare/4.15.1...4.15.2) (2026-07-01)
+
+
+* 修复 Build 错误：dependencies are mismatched easy-us (lockfile: ^0.0.60, manifest: ^0.0.66) ([939e675](https://github.com/ocsjs/ocsjs/commit/939e6759e20613216ec836de68f0477054f3bcc3))
+
 ## [4.15.1](https://github.com/ocsjs/ocsjs/compare/4.15.0...4.15.1) (2026-07-01)
 
 
