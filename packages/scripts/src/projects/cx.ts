@@ -2080,7 +2080,7 @@ const JobRunner = {
 				worker?.emit('close');
 				await $.sleep(100);
 				try {
-					const result = await JobRunner.chapter(frame, options, false);
+					const result = await JobRunner.chapter(frame, options);
 					return { started: result !== 'skipped' };
 				} finally {
 					restartRequested = false;
