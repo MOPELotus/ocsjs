@@ -103,6 +103,15 @@ function cxAnswerText(value: unknown): string {
 	return '';
 }
 
+function normalizedCXQuestionStem(root: HTMLElement): string {
+	const title = root.querySelector<HTMLElement>('.Zy_TItle .clearfix,.splitS-left .mark_name')?.innerText || root.innerText;
+	return title
+		.replace(/【[^】]+】/g, '')
+		.replace(/^\s*\d+\s*[。、.)]?\s*/, '')
+		.replace(/\s+/g, '')
+		.trim();
+}
+
 function createCXAnswerPayload(root: HTMLElement, title: string, type: CXQuestionType, options: HTMLElement[]) {
 	const nativeType = getCXNativeType(root);
 	const details = getCXQuestionDetails(root, title, nativeType, renderCXElement);
@@ -139,12 +148,16 @@ async function fillCXTextQuestion(
 	/** 超星点击“修改答案”时可能整块替换 .TiMu，旧 root 会变成脱离文档的快照。 */
 	if (targets.length === 0 && root.ownerDocument) {
 		const rootData = root.getAttribute('data');
+		const questionStem = normalizedCXQuestionStem(root);
 		const candidates = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>('.TiMu,.questionLi,.singleQuesId'));
-		const current = candidates.find(
-			(candidate) =>
-				candidate !== root &&
-				((rootData && candidate.getAttribute('data') === rootData) || getCXCompletionTargets(candidate).length > 0)
-		);
+		const current = candidates.find((candidate) => {
+			if (candidate === root || getCXCompletionTargets(candidate).length === 0) return false;
+			const candidateStem = normalizedCXQuestionStem(candidate);
+			return (
+				(questionStem && candidateStem && (candidateStem.includes(questionStem) || questionStem.includes(candidateStem))) ||
+				(!!rootData && candidate.getAttribute('data') === rootData)
+			);
+		});
 		if (current) {
 			activeRoot = current;
 			activeConfiguredTargets = [];
@@ -182,16 +195,6 @@ async function fillCXTextQuestion(
 		}
 	}
 	if (targets.length === 0) {
-		$console.error('CX 简答题编辑框解析失败', {
-			root: `${root.tagName}#${root.id}.${root.className}`,
-			configured: configuredTargets.length,
-			controls: root.querySelectorAll(
-				'textarea,input[type="text"],input:not([type]),iframe,[contenteditable="true"],.textDIV,.eidtDiv,.editDiv'
-			).length,
-			editButtons: Array.from(root.querySelectorAll('a,button,input[type="button"],input[type="submit"]')).map(
-				(element) => ((element as HTMLElement).innerText || (element as HTMLInputElement).value || '').trim()
-			)
-		});
 		throw new Error('已获取主观题/填空题答案，但未找到可填写的编辑框。');
 	}
 
