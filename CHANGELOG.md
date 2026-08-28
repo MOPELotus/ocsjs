@@ -1,3 +1,10 @@
+## [4.15.4](https://github.com/MOPELotus/ocsjs/compare/4.15.3...4.15.4) (2026-08-28)
+
+
+* **fork:** 接入 Responses 题库与多题型、图片附件和题目样式处理
+* **fork:** 修复超星主观题编辑器识别、保存接口和只读章节测试处理
+* **fork:** 恢复未完成章节测试的手动“重新答题”入口
+
 ## [4.13.22](https://github.com/ocsjs/ocsjs/compare/4.13.19...4.13.22) (2026-06-11)
 
 
