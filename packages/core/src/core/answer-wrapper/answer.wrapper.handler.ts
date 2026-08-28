@@ -93,7 +93,7 @@ export async function defaultAnswerWrapperHandler(
 					// 构造请求数据
 					const data: Record<string, string> = Object.create({});
 					/** 构造一个请求数据 */
-					Object.keys(wrapperData).forEach((key) => {
+					for (const key of Object.keys(wrapperData)) {
 						// 如果存在字段解析器
 						if (typeof (wrapperData as any)[key] === 'object' && Reflect.has((wrapperData as any)[key], 'handler')) {
 							// eslint-disable-next-line no-new-func
@@ -101,13 +101,13 @@ export async function defaultAnswerWrapperHandler(
 							if (typeof handler !== 'function') {
 								throw new Error('data 字段解析器必须返回一个函数');
 							}
-							const result = handler(env);
+							const result = await handler(env);
 							Reflect.set(data, key, result);
 						} else {
 							// 解析data数据
 							Reflect.set(data, key, resolvePlaceHolder(wrapperData[key]));
 						}
-					});
+					}
 
 					requestData = data;
 				} else {

@@ -1,5 +1,11 @@
 <div align="center">
 
+> 这是 [ocsjs/ocsjs](https://github.com/ocsjs/ocsjs) 的自动同步修改版。
+> 修改版增加 Responses AI 题库所需的下划线、挖空和选项边界保留，并内置独立题库后端。
+
+**[安装 MOPELotus 全域名修改版](https://raw.githubusercontent.com/MOPELotus/ocsjs/dist/ocs.common.user.js)** ·
+**[部署 Responses 题库后端](./response_service/README.md)**
+
 <div style="padding:8px;border-radius:100%;background:white;width:124px;height:124px">
 <img src="https://cdn.ocsjs.com/resources/img/logo.png" width=124 height=124  >
 </div>

@@ -26,10 +26,11 @@ async function testResolver() {
 }
 
 async function buildPackages() {
+	const buildEnv = { ...process.env, VITE_BUILD_PATH: distResolvedPath };
 	await execOut('tsc', { cwd: '../packages/core' });
-	await execOut('vite build', { cwd: '../packages/core' });
+	await execOut('vite build', { cwd: '../packages/core', env: buildEnv });
 	await execOut('tsc', { cwd: '../packages/scripts' });
-	await execOut('vite build', { cwd: '../packages/scripts' });
+	await execOut('vite build', { cwd: '../packages/scripts', env: buildEnv });
 }
 
 async function createUserJs() {
@@ -137,7 +138,16 @@ async function createUserJs() {
 
 	/** 创建全Connect域名通用脚本 */
 	const commonOpts = createOptions();
-	commonOpts.metadata.name = commonOpts.metadata.name + ' - 全域名通用版';
+	const forkRawRoot = process.env.OCS_FORK_RAW_ROOT || 'https://raw.githubusercontent.com/MOPELotus/ocsjs/dist';
+	Object.assign(commonOpts.metadata, {
+		name: 'OCS 网课助手 - MOPELotus 全域名修改版',
+		version: process.env.OCS_BUILD_VERSION || `${version}.1`,
+		namespace: 'https://github.com/MOPELotus/ocsjs',
+		homepage: 'https://github.com/MOPELotus/ocsjs',
+		source: 'https://github.com/MOPELotus/ocsjs',
+		updateURL: `${forkRawRoot}/ocs.common.meta.js`,
+		downloadURL: `${forkRawRoot}/ocs.common.user.js`
+	});
 	const connect = Array.isArray(commonOpts.metadata.connect) ? commonOpts.metadata.connect : [];
 	connect.push('*');
 	commonOpts.metadata.connect = connect;

@@ -835,6 +835,10 @@ function workOrExam(
 						return defaultAnswerWrapperHandler(answererWrappers, {
 							type,
 							title,
+							option_items:
+								type === 'completion'
+									? []
+									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText),
 							options:
 								type === 'completion'
 									? ''
@@ -1898,6 +1902,10 @@ const JobRunner = {
 						return defaultAnswerWrapperHandler(answererWrappers, {
 							type,
 							title,
+							option_items:
+								type === 'completion'
+									? []
+									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText),
 							options:
 								type === 'completion'
 									? ''

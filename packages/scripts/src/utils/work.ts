@@ -186,6 +186,8 @@ export function createWorkerControl(options: {
  */
 export function optimizationElementWithImage(root: HTMLElement, clone_node: boolean = false): HTMLElement {
 	const clone = clone_node ? (root.cloneNode(true) as HTMLElement) : root;
+	const sourceElements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+	const clonedElements = [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('*'))];
 	for (const img of Array.from(clone.querySelectorAll('img'))) {
 		// 如果已经存在识别结果，则不处理
 		if (
@@ -201,6 +203,63 @@ export function optimizationElementWithImage(root: HTMLElement, clone_node: bool
 		// 隐藏图片，但不影响 innerText 的获取
 		src.style.fontSize = '0px';
 		img.after(src);
+	}
+
+	if (!clone_node) return clone;
+	let blankIndex = 0;
+	// innerText 会丢失 <u>、text-decoration 和挖空底边框。用源节点
+	// 的实际样式判断，再在克隆节点中写入服务端可理解的语义标记。
+	for (let i = clonedElements.length - 1; i >= 1; i--) {
+		const source = sourceElements[i];
+		const target = clonedElements[i];
+		if (!source || !target || (!target.isConnected && !target.parentNode)) continue;
+		let style: CSSStyleDeclaration | undefined;
+		try {
+			style = getComputedStyle(source);
+		} catch (_) {
+			style = undefined;
+		}
+		const className = String(source.className || '').toLowerCase();
+		const inlineStyle = String(source.getAttribute('style') || '').toLowerCase();
+		const inputType = String(source.getAttribute('type') || 'text').toLowerCase();
+		const blankInput =
+			(source.tagName === 'TEXTAREA' || source.getAttribute('contenteditable') === 'true' || source.tagName === 'INPUT') &&
+			!['hidden', 'radio', 'checkbox', 'button', 'submit'].includes(inputType);
+		const bottomOnly =
+			!!style &&
+			parseFloat(style.borderBottomWidth || '0') > 0 &&
+			parseFloat(style.borderTopWidth || '0') === 0 &&
+			parseFloat(style.borderLeftWidth || '0') === 0 &&
+			parseFloat(style.borderRightWidth || '0') === 0;
+		const underlined =
+			['U', 'INS'].includes(source.tagName) ||
+			/underline|under-line/.test(className) ||
+			/text-decoration(?:-line)?\s*:\s*underline/.test(inlineStyle) ||
+			style?.textDecorationLine?.includes('underline') ||
+			bottomOnly;
+		if (!underlined && !blankInput) continue;
+		const text = blankInput ? '' : String(target.textContent || '').trim();
+		const marker = text
+			? ` [UNDERLINE]${text}[/UNDERLINE] `
+			: ` [BLANK_${++blankIndex}] `;
+		target.replaceWith(document.createTextNode(marker));
+	}
+
+	// 有些题把答案区写成“(&nbsp; &nbsp;)”，既没有 input，也没有
+	// underline 样式。保留括号，仅把其中的连续空白转换成挖空标记。
+	const textWalker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+	const textNodes: Text[] = [];
+	let current = textWalker.nextNode();
+	while (current) {
+		if (current instanceof Text) textNodes.push(current);
+		current = textWalker.nextNode();
+	}
+	for (const node of textNodes) {
+		node.nodeValue = String(node.nodeValue || '').replace(
+			/([（(\[])[\u00a0 \t]{2,}([）)\]])|_{2,}|＿{2,}|﹍{2,}/g,
+			(_matched, open, close) =>
+				open ? `${open}[BLANK_${++blankIndex}]${close}` : ` [BLANK_${++blankIndex}] `
+		);
 	}
 	return clone;
 }
