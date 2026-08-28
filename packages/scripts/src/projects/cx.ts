@@ -133,7 +133,27 @@ async function fillCXTextQuestion(
 	configuredTargets: HTMLElement[],
 	answerSeparators: string[] = []
 ) {
-	const targets = getCXCompletionTargets(root, configuredTargets);
+	let targets = getCXCompletionTargets(root, configuredTargets);
+	/**
+	 * 已提交/待批阅的章节作业会先渲染为只读答案，并把编辑器隐藏在“修改答案”
+	 * 按钮之后。答题器可能比用户点击按钮更早启动，因此这里主动进入编辑态，
+	 * 等待 UEditor 和其隐藏 textarea 注入后再解析目标。
+	 */
+	if (targets.length === 0) {
+		const editTrigger = Array.from(
+			root.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
+		).find((element) =>
+			/修改答案|编辑答案|重新作答/.test((element.innerText || (element as HTMLInputElement).value || '').trim())
+		);
+		if (editTrigger) {
+			editTrigger.click();
+			for (let attempt = 0; attempt < 20; attempt++) {
+				await $.sleep(200);
+				targets = getCXCompletionTargets(root, configuredTargets);
+				if (targets.length > 0) break;
+			}
+		}
+	}
 	if (targets.length === 0) {
 		throw new Error('已获取主观题/填空题答案，但未找到可填写的编辑框。');
 	}
