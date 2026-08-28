@@ -166,6 +166,31 @@ function uniqueElements(elements: HTMLElement[]): HTMLElement[] {
 	return elements.filter((element, index) => elements.indexOf(element) === index);
 }
 
+const ueditorFrameSelector = 'iframe[id^="ueditor_"],.edui-editor iframe';
+const ueditorTextareaSelector = 'textarea[id^="answer"],textarea[name^="answer"]';
+
+/**
+ * Chaoxing's UEditor exposes one visible iframe and one hidden answer textarea for
+ * the same answer. Resolve both controls to their smallest shared wrapper so they
+ * count as one logical blank instead of two.
+ */
+function getUEditorLogicalTarget(control: HTMLElement, root: HTMLElement): HTMLElement | undefined {
+	const isEditorFrame =
+		control.matches(ueditorFrameSelector) ||
+		(control.matches('iframe') && !!control.closest('.edui-editor,.edui-editor-iframeholder'));
+	const isBackingTextarea = control.matches(ueditorTextareaSelector);
+	if (!isEditorFrame && !isBackingTextarea) return;
+
+	let container = control.parentElement;
+	while (container && root.contains(container)) {
+		const frames = container.querySelectorAll(ueditorFrameSelector);
+		const textareas = container.querySelectorAll(ueditorTextareaSelector);
+		if (frames.length === 1 && textareas.length === 1) return container;
+		if (container === root) break;
+		container = container.parentElement;
+	}
+}
+
 /** Return one target per visible/logical answer editor, not one target per nested iframe/textarea. */
 export function getCXCompletionTargets(root: HTMLElement, configured: HTMLElement[] = []): HTMLElement[] {
 	const controls = [
@@ -178,6 +203,11 @@ export function getCXCompletionTargets(root: HTMLElement, configured: HTMLElemen
 	];
 	const targets: HTMLElement[] = [];
 	for (const control of controls) {
+		const editorGroup = getUEditorLogicalTarget(control, root);
+		if (editorGroup) {
+			targets.push(editorGroup);
+			continue;
+		}
 		const group = control.closest<HTMLElement>('.Briefanswer[data-itemid],.blankItem,.jdt,.textDIV,.eidtDiv,.editDiv');
 		if (group && root.contains(group)) targets.push(group);
 		else if (root.contains(control) || control === root) targets.push(control);

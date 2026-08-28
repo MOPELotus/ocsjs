@@ -1,8 +1,13 @@
 import {
 	answerValueList,
+	fillCXCompletionTarget,
 	getCXAnswerCandidates,
+	getCXCompletionTargets,
 	getCXQuestionType
 } from '../packages/scripts/src/projects/cx-question';
+
+const browserEnv = require('browser-env');
+browserEnv();
 
 let passed = 0;
 
@@ -31,5 +36,34 @@ const searchInfos = [
 const candidates = getCXAnswerCandidates(searchInfos);
 equal(candidates, [[{ answer: 'A' }, { answer: ['B', 'D'] }]], 'compound JSON is preserved');
 equal(answerValueList(candidates[0]), ['A', ['B', 'D']], 'compound answers keep child boundaries');
+
+const shortAnswerRoot = document.createElement('div');
+shortAnswerRoot.className = 'TiMu newTiMu';
+shortAnswerRoot.innerHTML = `
+	<ul class="Zy_ulTk">
+		<li>
+			<div class="edui-default">
+				<div class="edui-editor edui-default">
+					<div class="edui-editor-iframeholder"><iframe id="ueditor_0"></iframe></div>
+				</div>
+			</div>
+			<textarea id="answer401848682" name="answer401848682" style="display:none"></textarea>
+			<input type="hidden" id="answertype401848682" name="answertype401848682">
+		</li>
+	</ul>
+`;
+const shortAnswerTargets = getCXCompletionTargets(shortAnswerRoot);
+equal(shortAnswerTargets.length, 1, 'UEditor iframe and backing textarea are one target');
+equal(
+	[shortAnswerTargets[0].querySelectorAll('iframe').length, shortAnswerTargets[0].querySelectorAll('textarea').length],
+	[1, 1],
+	'UEditor logical target contains both controls'
+);
+equal(fillCXCompletionTarget(shortAnswerTargets[0], '测试答案'), true, 'UEditor logical target can be filled');
+equal(
+	(shortAnswerRoot.querySelector('textarea') as HTMLTextAreaElement).value,
+	'测试答案',
+	'UEditor backing textarea receives the answer'
+);
 
 console.log(`\n  ✅ ${passed} Chaoxing question-shape tests passed\n`);
