@@ -113,6 +113,16 @@ export function getCXNativeType(root: HTMLElement): string {
 	).trim();
 }
 
+/** Prefer a non-empty explicit type, then fall back to the type stored on the question root. */
+export function resolveCXQuestionType(
+	root: HTMLElement,
+	label = '',
+	explicitNativeType: string | number | null | undefined = ''
+): CXQuestionType {
+	const nativeType = String(explicitNativeType ?? '').trim() || getCXNativeType(root);
+	return getCXQuestionType(Number.parseInt(nativeType || '-1'), label);
+}
+
 function normalizeAnswerItem(value: unknown): unknown {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
 	const item = value as Record<string, unknown>;

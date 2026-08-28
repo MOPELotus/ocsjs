@@ -3,7 +3,8 @@ import {
 	fillCXCompletionTarget,
 	getCXAnswerCandidates,
 	getCXCompletionTargets,
-	getCXQuestionType
+	getCXQuestionType,
+	resolveCXQuestionType
 } from '../packages/scripts/src/projects/cx-question';
 
 const browserEnv = require('browser-env');
@@ -39,6 +40,7 @@ equal(answerValueList(candidates[0]), ['A', ['B', 'D']], 'compound answers keep 
 
 const shortAnswerRoot = document.createElement('div');
 shortAnswerRoot.className = 'TiMu newTiMu';
+shortAnswerRoot.setAttribute('data', '4');
 shortAnswerRoot.innerHTML = `
 	<ul class="Zy_ulTk">
 		<li>
@@ -52,6 +54,17 @@ shortAnswerRoot.innerHTML = `
 		</li>
 	</ul>
 `;
+equal(
+	resolveCXQuestionType(shortAnswerRoot, '简述钠离子依赖式主动转运方式，并举例说明。', ''),
+	'shortanswer',
+	'empty answertype falls back to TiMu data attribute'
+);
+shortAnswerRoot.setAttribute('data', '401848682');
+equal(
+	resolveCXQuestionType(shortAnswerRoot, '【简答题】简述钠离子依赖式主动转运方式，并举例说明。', ''),
+	'shortanswer',
+	'visible label overrides a question-id data attribute'
+);
 const shortAnswerTargets = getCXCompletionTargets(shortAnswerRoot);
 equal(shortAnswerTargets.length, 1, 'UEditor iframe and backing textarea are one target');
 equal(

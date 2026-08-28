@@ -38,7 +38,7 @@ import {
 	getCXCompletionTargets,
 	getCXNativeType,
 	getCXQuestionDetails,
-	getCXQuestionType
+	resolveCXQuestionType
 } from './cx-question';
 
 // @ts-ignore
@@ -114,6 +114,10 @@ function createCXAnswerPayload(root: HTMLElement, title: string, type: CXQuestio
 		options: optionItems.join('\n'),
 		...details
 	};
+}
+
+function getCXVisibleTypeLabel(titles: (HTMLElement | undefined)[]): string {
+	return titles.map((title) => title?.innerText || title?.textContent || '').join('\n');
 }
 
 function searchCXAnswer(title: string, type: CXQuestionType, search: () => Promise<SearchInformation[]>) {
@@ -1057,7 +1061,7 @@ function workOrExam(
 				const title = workOrExamQuestionTitleTransform(elements.title);
 				if (title) {
 					const typeInput = elements.type[0] as HTMLInputElement;
-					const type = getQuestionType(parseInt(typeInput?.value || '-1'), title);
+					const type = resolveCXQuestionType(ctx.root, getCXVisibleTypeLabel(elements.title), typeInput?.value);
 					if (type === 'poll' || type === 'oral' || type === 'oral_evaluation') {
 						throw new Error('此题需要投票或录音作答，OCS 不会伪造答案或误报完成。');
 					}
@@ -1081,10 +1085,10 @@ function workOrExam(
 
 			// 在非预览模式下会出现多个干扰项 type，这里提取正确的
 
-			const nativeType = parseInt(
-				elements.type.find((t) => t.getAttribute('name')?.match(/(?:answer)?type\d+/))?.getAttribute('value') || '-1'
-			);
-			const type = getQuestionType(nativeType, workOrExamQuestionTitleTransform(elements.title));
+			const nativeType = elements.type
+				.find((t) => t.getAttribute('name')?.match(/(?:answer)?type\d+/))
+				?.getAttribute('value');
+			const type = resolveCXQuestionType(ctx.root, getCXVisibleTypeLabel(elements.title), nativeType);
 
 			if (type === 'multiple' || type === 'judgement' || type === 'single' || type === 'evaluation') {
 				const choiceType = type === 'evaluation' ? 'multiple' : type;
@@ -2085,7 +2089,7 @@ const JobRunner = {
 				const title = chapterTestTaskQuestionTitleTransform(elements.title);
 				if (title) {
 					const typeInput = elements.type[0] as HTMLInputElement;
-					const type = getQuestionType(parseInt(typeInput?.value || '-1'), title);
+					const type = resolveCXQuestionType(ctx.root, getCXVisibleTypeLabel(elements.title), typeInput?.value);
 					if (type === 'poll' || type === 'oral' || type === 'oral_evaluation') {
 						throw new Error('此题需要投票或录音作答，OCS 不会伪造答案或误报完成。');
 					}
@@ -2105,10 +2109,7 @@ const JobRunner = {
 			work: async (ctx) => {
 				const { elements, searchInfos } = ctx;
 				const typeInput = elements.type[0] as HTMLInputElement;
-				const type = getQuestionType(
-					parseInt(typeInput?.value || '-1'),
-					chapterTestTaskQuestionTitleTransform(elements.title)
-				);
+				const type = resolveCXQuestionType(ctx.root, getCXVisibleTypeLabel(elements.title), typeInput?.value);
 
 				if (type === 'multiple' || type === 'judgement' || type === 'single' || type === 'evaluation') {
 					const choiceType = type === 'evaluation' ? 'multiple' : type;
@@ -2165,9 +2166,10 @@ const JobRunner = {
 					const options = curr.ctx?.elements?.options || [];
 
 					const typeInput = curr.ctx?.elements?.type[0] as HTMLInputElement | undefined;
-					const type = getQuestionType(
-						parseInt(typeInput?.value || '-1'),
-						chapterTestTaskQuestionTitleTransform(curr.ctx?.elements?.title || [])
+					const type = resolveCXQuestionType(
+						curr.ctx!.root,
+						getCXVisibleTypeLabel(curr.ctx?.elements?.title || []),
+						typeInput?.value
 					);
 
 					const commonSetting = CommonProject.scripts.settings.cfg;
@@ -2202,7 +2204,10 @@ const JobRunner = {
 			},
 			async onElementSearched(elements) {
 				const typeInput = elements.type[0] as HTMLInputElement;
-				const type = getQuestionType(parseInt(typeInput?.value || '-1'), elements.title?.[0]?.innerText || '');
+				const questionRoot =
+					typeInput?.closest<HTMLElement>('.TiMu') || elements.title?.[0]?.closest<HTMLElement>('.TiMu');
+				if (!questionRoot) return;
+				const type = resolveCXQuestionType(questionRoot, elements.title?.[0]?.innerText || '', typeInput?.value);
 
 				/** 判断题转换成文字，以便于答题程序判断 */
 				if (type === 'judgement') {
@@ -2337,10 +2342,6 @@ const JobRunner = {
  * 22 口语测评题
  * 26 写作题
  */
-function getQuestionType(val: number, label = ''): CXQuestionType {
-	return getCXQuestionType(val, label);
-}
-
 function hasFaceRecognition() {
 	// 人脸元素有时候 src 属性为空字符串，所以这里需要判断 src 是否为空字符串，如是则人脸识别会出现。
 	const faces = $$el<HTMLImageElement>('#fcqrimg', top?.document);
