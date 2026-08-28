@@ -4,7 +4,9 @@ import {
 	getCXAnswerCandidates,
 	getCXCompletionTargets,
 	getCXQuestionType,
-	resolveCXQuestionType
+	resolveCXQuestionType,
+	findCXEditTrigger,
+	isCXQuestionReadOnly
 } from '../packages/scripts/src/projects/cx-question';
 
 const browserEnv = require('browser-env');
@@ -78,5 +80,20 @@ equal(
 	'测试答案',
 	'UEditor backing textarea receives the answer'
 );
+
+const readOnlyRoot = document.createElement('div');
+readOnlyRoot.className = 'TiMu newTiMu';
+readOnlyRoot.innerHTML = '<div class="Zy_TItle">简述题目</div><div class="newAnswerBx">我的答案：已有答案</div>';
+equal(isCXQuestionReadOnly(readOnlyRoot), true, 'saved answer without editor is read-only');
+equal(isCXQuestionReadOnly(shortAnswerRoot), false, 'UEditor answer remains editable');
+
+const choiceRoot = document.createElement('div');
+choiceRoot.className = 'TiMu';
+choiceRoot.innerHTML = '<div>我的答案：A</div><label><input type="radio" name="choice"></label>';
+equal(isCXQuestionReadOnly(choiceRoot), false, 'editable choice question is not read-only');
+
+const editDocument = document.implementation.createHTMLDocument('chapter');
+editDocument.body.innerHTML = '<a id="edit">修改答案</a>';
+equal(findCXEditTrigger(editDocument)?.id, 'edit', 'find Chaoxing edit trigger');
 
 console.log(`\n  ✅ ${passed} Chaoxing question-shape tests passed\n`);
