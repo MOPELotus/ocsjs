@@ -28,7 +28,7 @@ jobs:
           echo 'VITE_BUILD_PATH="../../release"' > ./packages/scripts/.env
           echo "BUILDTIME=$(TZ=Asia/Shanghai date)" >> $GITHUB_ENV
           echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_ENV
-          echo "DOWNLOAD_URL=https://github.com/ocsjs/ocsjs/releases/download/${GITHUB_REF_NAME}/" >> $GITHUB_ENV
+          echo "DOWNLOAD_URL=https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/" >> $GITHUB_ENV
 
       - name: Install Dependencies
         run: |
