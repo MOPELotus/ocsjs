@@ -6,7 +6,8 @@ import {
 	getCXQuestionType,
 	resolveCXQuestionType,
 	findCXEditTrigger,
-	isCXQuestionReadOnly
+	isCXQuestionReadOnly,
+	hasCXEditableControls
 } from '../packages/scripts/src/projects/cx-question';
 
 const browserEnv = require('browser-env');
@@ -86,6 +87,8 @@ readOnlyRoot.className = 'TiMu newTiMu';
 readOnlyRoot.innerHTML = '<div class="Zy_TItle">简述题目</div><div class="newAnswerBx">我的答案：已有答案</div>';
 equal(isCXQuestionReadOnly(readOnlyRoot), true, 'saved answer without editor is read-only');
 equal(isCXQuestionReadOnly(shortAnswerRoot), false, 'UEditor answer remains editable');
+equal(hasCXEditableControls(shortAnswerRoot), true, 'UEditor exposes editable controls');
+equal(hasCXEditableControls(readOnlyRoot), false, 'saved answer exposes no editable controls');
 
 const choiceRoot = document.createElement('div');
 choiceRoot.className = 'TiMu';

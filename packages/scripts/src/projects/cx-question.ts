@@ -234,6 +234,8 @@ export function getCXCompletionTargets(root: HTMLElement, configured: HTMLElemen
 }
 
 const cxEditTriggerPattern = /修改答案|编辑答案|重新作答/;
+const cxEditableControlSelector =
+	'iframe[id^="ueditor_"],.edui-editor iframe,textarea[id^="answer"],textarea[name^="answer"],textarea:not([readonly]):not([disabled]),input[type="text"]:not([readonly]):not([disabled]),input:not([type]):not([readonly]):not([disabled]),select:not([disabled]),input[type="radio"]:not([disabled]),input[type="checkbox"]:not([disabled]),[contenteditable="true"]';
 
 function cxControlText(element: HTMLElement): string {
 	return [
@@ -266,11 +268,12 @@ export function findCXEditTrigger(root: HTMLElement | Document): HTMLElement | u
 export function isCXQuestionReadOnly(root: HTMLElement): boolean {
 	const text = root.innerText || root.textContent || '';
 	if (!/(我的答案|已作答|已回答|参考答案|答案解析)/.test(text)) return false;
+	return !hasCXEditableControls(root);
+}
 
-	const writableEditor = root.querySelector(
-		'textarea:not([readonly]):not([disabled]),input[type="text"]:not([readonly]):not([disabled]),input:not([type]):not([readonly]):not([disabled]),select:not([disabled]),input[type="radio"]:not([disabled]),input[type="checkbox"]:not([disabled]),[contenteditable="true"]'
-	);
-	return !writableEditor && getCXCompletionTargets(root).length === 0;
+/** Detect controls that Chaoxing exposes only after entering answer-edit mode. */
+export function hasCXEditableControls(root: HTMLElement): boolean {
+	return !!root.querySelector(cxEditableControlSelector);
 }
 
 function dispatchValueEvent(target: EventTarget, type: string) {

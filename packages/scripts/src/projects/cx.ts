@@ -39,6 +39,7 @@ import {
 	getCXNativeType,
 	getCXQuestionDetails,
 	findCXEditTrigger,
+	hasCXEditableControls,
 	isCXQuestionReadOnly,
 	resolveCXQuestionType
 } from './cx-question';
@@ -1747,21 +1748,36 @@ function searchIFrame(root: Document) {
  * submitted test as a read-only answer block and only creates the real editors
  * after the global “修改答案” action replaces the question DOM.
  */
-async function prepareCXChapterRoots(frameWindow: Window, initialRoots: HTMLElement[]): Promise<HTMLElement[]> {
+type CXChapterPreparation =
+	| { state: 'ready'; roots: HTMLElement[] }
+	| { state: 'skip'; roots: HTMLElement[] }
+	| { state: 'retry' };
+
+async function prepareCXChapterRoots(
+	frameWindow: Window,
+	initialRoots: HTMLElement[],
+	afterEdit = false
+): Promise<CXChapterPreparation> {
 	const status = frameWindow.document.querySelector<HTMLElement>('.testTit_status');
 	if (status?.classList.contains('testTit_status_complete') || /已完成/.test(status?.innerText || '')) {
 		$console.info('章节测试已完成，不进入修改答案页面。');
-		return [];
+		return { state: 'skip', roots: [] };
 	}
 
-	const getRoots = () => {
-		const roots = Array.from(frameWindow.document.querySelectorAll<HTMLElement>('.TiMu'));
-		return roots.length ? roots : initialRoots;
-	};
+	const getLiveRoots = () => Array.from(frameWindow.document.querySelectorAll<HTMLElement>('.TiMu'));
+	let roots = getLiveRoots();
+	if (roots.length === 0) roots = initialRoots;
+	const readOnlyRoots = roots.filter(isCXQuestionReadOnly);
 
-	let roots = getRoots();
-	let readOnlyRoots = roots.filter(isCXQuestionReadOnly);
-	if (readOnlyRoots.length === 0) return roots;
+	// A normal unfinished page has no edit trigger and should enter the original
+	// answer flow unchanged. Only a submitted/read-only page needs preparation.
+	if (readOnlyRoots.length === 0) return { state: 'ready', roots };
+	if (afterEdit) {
+		const editableRoots = roots.filter((root) => !isCXQuestionReadOnly(root));
+		if (editableRoots.length > 0) return { state: 'ready', roots: editableRoots };
+		$console.warn('重新进入章节答题流程后仍检测到只读题目，跳过当前章节测试。');
+		return { state: 'skip', roots: [] };
+	}
 
 	// The edit link can be injected slightly after the question block. Give it a
 	// short grace period before deciding that a read-only task has no edit path.
@@ -1773,7 +1789,7 @@ async function prepareCXChapterRoots(frameWindow: Window, initialRoots: HTMLElem
 
 	if (!editTrigger) {
 		$console.info('检测到章节测试题目为只读且没有修改入口，跳过已保存题目。');
-		return roots.filter((root) => !isCXQuestionReadOnly(root));
+		return { state: 'skip', roots: roots.filter((root) => !isCXQuestionReadOnly(root)) };
 	}
 
 	$console.info('检测到章节测试存在修改入口，先进入修改答案页面。');
@@ -1781,18 +1797,28 @@ async function prepareCXChapterRoots(frameWindow: Window, initialRoots: HTMLElem
 
 	// Clicking “修改答案” replaces .TiMu nodes. Re-query the document instead of
 	// retaining the detached roots captured by searchJob.
+	let editModeReached = false;
 	for (let attempt = 0; attempt < 40; attempt++) {
 		await $.sleep(200);
-		roots = getRoots();
-		readOnlyRoots = roots.filter(isCXQuestionReadOnly);
-		if (roots.length > 0 && readOnlyRoots.length === 0) break;
+		const liveRoots = getLiveRoots();
+		if (liveRoots.length === 0) continue;
+		roots = liveRoots;
+		const editableControl = roots.some(hasCXEditableControls);
+		if (editableControl) {
+			editModeReached = true;
+			break;
+		}
 	}
 
-	const editableRoots = roots.filter((root) => !isCXQuestionReadOnly(root));
-	if (editableRoots.length === 0) {
-		$console.warn('修改答案入口未能打开可编辑题目，跳过当前章节测试。');
+	if (!editModeReached) {
+		$console.warn('修改答案入口未能确认已进入编辑态，跳过当前章节测试。');
+		return { state: 'skip', roots: [] };
 	}
-	return editableRoots;
+
+	// Do not continue with this invocation: the old OCSWorker context may already
+	// contain detached read-only roots. Start a fresh chapter invocation so every
+	// element/title/options lookup happens after Chaoxing's DOM replacement.
+	return { state: 'retry' };
 }
 
 /**
@@ -2141,9 +2167,8 @@ const JobRunner = {
 	/**
 	 * 章节测验
 	 */
-	async chapter(
-		frame: HTMLIFrameElement,
-		{
+	async chapter(frame: HTMLIFrameElement, options: CommonWorkOptions, afterEdit = false): Promise<void> {
+		const {
 			answererWrappers,
 			period,
 			upload,
@@ -2151,8 +2176,7 @@ const JobRunner = {
 			stopSecondWhenFinish,
 			redundanceWordsText,
 			answerSeparators
-		}: CommonWorkOptions
-	) {
+		} = options;
 		if (answererWrappers === undefined || answererWrappers.length === 0) {
 			return answerWrapperEmptyWarning(0);
 		}
@@ -2163,11 +2187,16 @@ const JobRunner = {
 		const frameWindow = frame.contentWindow!;
 		const frameApi = frameWindow as any;
 		const { TiMu: initialTiMu } = domSearchAll({ TiMu: '.TiMu' }, frameWindow!.document);
-		const TiMu = await prepareCXChapterRoots(frameWindow, initialTiMu);
-		if (TiMu.length === 0) {
+		const preparation = await prepareCXChapterRoots(frameWindow, initialTiMu, afterEdit);
+		if (preparation.state === 'retry') {
+			$console.info('修改答案后重新创建章节答题器。');
+			return JobRunner.chapter(frame, options, true);
+		}
+		if (preparation.state === 'skip' || preparation.roots.length === 0) {
 			$console.info('当前章节测试没有可编辑题目，已跳过。');
 			return;
 		}
+		const TiMu = preparation.roots;
 
 		// 最大化面板
 		CORSUtils.panelNormal();
