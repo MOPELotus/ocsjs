@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/sync-and-publish-patched.yml"
       - "packages/core/src/core/answer-wrapper/answer.wrapper.handler.ts"
+      - "packages/scripts/src/projects/common.ts"
       - "packages/scripts/src/projects/cx.ts"
       - "packages/scripts/src/utils/work.ts"
       - "response_service/**"
@@ -86,7 +87,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install -r response_service/requirements.txt
-          python -m unittest response_service.tests.test_engine -v
+          python -m unittest discover -s response_service/tests -v
 
       - name: Prepare update files
         shell: bash

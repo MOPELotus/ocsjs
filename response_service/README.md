@@ -21,13 +21,13 @@ cp response_service/.env.example response_service/.env
 ```env
 OPENAI_BASE_URL=https://api.openai.com
 OPENAI_API_KEY=sk-your-key
-OPENAI_MODEL=gpt-5.2
-OPENAI_REASONING_EFFORT=medium
+OPENAI_MODEL=gpt-5.6-sol
+OPENAI_REASONING_EFFORT=xhigh
 
 SERVICE_ACCESS_TOKEN=change-this-to-a-long-random-value
 
-REQUEST_TIMEOUT_SECONDS=180
-IMAGE_TIMEOUT_SECONDS=20
+REQUEST_TIMEOUT_SECONDS=600
+IMAGE_TIMEOUT_SECONDS=30
 MAX_IMAGES=24
 MAX_IMAGE_BYTES=12582912
 ANSWER_SEPARATOR=#
@@ -80,7 +80,9 @@ server {
     server_name answer.example.com;
 
     client_max_body_size 8m;
-    proxy_read_timeout 180s;
+    proxy_connect_timeout 30s;
+    proxy_send_timeout 660s;
+    proxy_read_timeout 660s;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -105,10 +107,12 @@ https://raw.githubusercontent.com/MOPELotus/ocsjs/dist/ocs.common.user.js
 
 高级设置建议：
 
-- 搜题最大耗时：`180` 秒；
-- 线程数量：先使用 `1`；
+- 搜题最大耗时：`720` 秒，要高于服务端的 `REQUEST_TIMEOUT_SECONDS=600`；
+- 线程数量：`sol + xhigh` 先使用 `1`，确认 API 并发限制后再提高；
 - 答案分隔符保留默认值，其中必须包含 `#`；
 - 初次测试选择“不保存也不提交”。
+
+本修改版已取消线程数量和搜题超时的界面上限，但仍保留最小值校验。旧版已保存的设置不会被新默认值覆盖，更新用户脚本后需手动把“搜题最大耗时”改为 `720`。
 
 只启用这一份 Responses AI 题库配置，避免 OCS 同时请求多个 AI 题库。
 

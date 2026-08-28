@@ -29,17 +29,17 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> Settings:
-        effort = os.getenv("OPENAI_REASONING_EFFORT", "medium").strip().casefold()
+        effort = os.getenv("OPENAI_REASONING_EFFORT", "xhigh").strip().casefold()
         if effort not in _EFFORTS:
-            effort = "medium"
+            effort = "xhigh"
         return cls(
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com").rstrip("/"),
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
             openai_model=os.getenv("OPENAI_MODEL", "").strip(),
             reasoning_effort=effort,
             service_access_token=os.getenv("SERVICE_ACCESS_TOKEN", "").strip(),
-            request_timeout_seconds=max(10.0, float(os.getenv("REQUEST_TIMEOUT_SECONDS", "180"))),
-            image_timeout_seconds=max(3.0, float(os.getenv("IMAGE_TIMEOUT_SECONDS", "20"))),
+            request_timeout_seconds=max(10.0, float(os.getenv("REQUEST_TIMEOUT_SECONDS", "600"))),
+            image_timeout_seconds=max(3.0, float(os.getenv("IMAGE_TIMEOUT_SECONDS", "30"))),
             max_images=max(1, int(os.getenv("MAX_IMAGES", "24"))),
             max_image_bytes=max(1024, int(os.getenv("MAX_IMAGE_BYTES", str(12 * 1024 * 1024)))),
             answer_separator=os.getenv("ANSWER_SEPARATOR", "#") or "#",

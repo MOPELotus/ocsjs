@@ -3,8 +3,8 @@ import { request } from '../utils/request';
 import { $ } from '../../utils';
 
 export const AnswerWrapperHandlerConfig = {
-	// 超时时间，单位毫秒
-	timeout_seconds: 60
+	// 超时时间，单位秒
+	timeout_seconds: 720
 };
 
 /**

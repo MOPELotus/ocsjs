@@ -472,9 +472,8 @@ export const CommonProject = Project.create({
 						type: 'number',
 						min: 1,
 						step: 1,
-						max: 3,
 						title:
-							'同一时间内答题线程工作的数量（例子：三个线程则代表一秒内同时搜索三道题），过多可能导致题库服务器压力过大，请适当调低。'
+							'同一时间内答题线程工作的数量，不设上限。每个线程都可能发起一次 AI 请求，请根据服务器和 API 并发能力设置。'
 					},
 					defaultValue: 1
 				},
@@ -525,10 +524,9 @@ export const CommonProject = Project.create({
 						type: 'number',
 						min: 10,
 						step: 1,
-						max: 3 * 60,
-						title: '搜题超时时间，单位为秒，超过这个时间直接放弃，进行下一题搜索。'
+						title: '搜题超时时间，单位为秒，不设上限。超过这个时间直接放弃，进行下一题搜索。'
 					},
-					defaultValue: 120
+					defaultValue: 720
 				},
 				stopSecondWhenFinish: {
 					showIf: 'common.settings.advancedSettings',
