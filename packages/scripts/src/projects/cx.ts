@@ -162,7 +162,7 @@ async function fillCXTextQuestion(
 				'textarea,input[type="text"],input:not([type]),iframe,[contenteditable="true"],.textDIV,.eidtDiv,.editDiv'
 			).length,
 			editButtons: Array.from(root.querySelectorAll('a,button,input[type="button"],input[type="submit"]')).map(
-				(element) => (element.innerText || (element as HTMLInputElement).value || '').trim()
+				(element) => ((element as HTMLElement).innerText || (element as HTMLInputElement).value || '').trim()
 			)
 		});
 		throw new Error('已获取主观题/填空题答案，但未找到可填写的编辑框。');
