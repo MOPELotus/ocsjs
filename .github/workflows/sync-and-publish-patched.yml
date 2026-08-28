@@ -3,18 +3,21 @@ name: Sync upstream and publish patched OCS
 on:
   workflow_dispatch:
   schedule:
-    - cron: "23 3 * * *"
+    - cron: '23 3 * * *'
   push:
     branches:
-      - "4.0"
+      - '4.0'
     paths:
-      - ".github/workflows/sync-and-publish-patched.yml"
-      - "packages/core/src/core/answer-wrapper/answer.wrapper.handler.ts"
-      - "packages/scripts/src/projects/common.ts"
-      - "packages/scripts/src/projects/cx.ts"
-      - "packages/scripts/src/utils/work.ts"
-      - "response_service/**"
-      - "scripts/build-core.js"
+      - '.github/workflows/sync-and-publish-patched.yml'
+      - 'packages/core/src/core/answer-wrapper/answer.wrapper.handler.ts'
+      - 'packages/scripts/src/projects/common.ts'
+      - 'packages/scripts/src/projects/cx.ts'
+      - 'packages/scripts/src/projects/cx-question.ts'
+      - 'packages/scripts/src/utils/work.ts'
+      - 'tests/**'
+      - 'package.json'
+      - 'response_service/**'
+      - 'scripts/build-core.js'
 
 permissions:
   contents: write
@@ -31,7 +34,7 @@ jobs:
       - name: Checkout fork
         uses: actions/checkout@v4
         with:
-          ref: "4.0"
+          ref: '4.0'
           fetch-depth: 0
 
       - name: Merge upstream
@@ -51,7 +54,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -62,13 +65,16 @@ jobs:
       - name: Install OCS dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test OCS answer resolvers
+        run: pnpm test
+
       - name: Build patched all-domain userscript
         shell: bash
         run: |
           set -euo pipefail
           BASE_VERSION="$(node -p "require('./package.json').version")"
           COMMIT_EPOCH="$(git show -s --format=%ct HEAD)"
-          export OCS_BUILD_VERSION="${BASE_VERSION}.${COMMIT_EPOCH}"
+          export OCS_BUILD_VERSION="${BASE_VERSION}-fork.${COMMIT_EPOCH}"
           export OCS_FORK_RAW_ROOT="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/dist"
           pnpm build
           test -s dist/ocs.common.user.js
@@ -78,7 +84,7 @@ jobs:
       - name: Test Responses service
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: '3.13'
           cache: pip
           cache-dependency-path: response_service/requirements.txt
 

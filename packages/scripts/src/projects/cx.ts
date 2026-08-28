@@ -8,7 +8,6 @@ import {
 	request,
 	createDefaultQuestionResolver,
 	DefaultWork,
-	splitAnswer,
 	domSearch,
 	domSearchAll,
 	SearchInformation
@@ -30,6 +29,17 @@ import Typr from 'typr.js';
 import { $console, BackgroundProject } from './background';
 import { CommonWorkOptions, playMedia } from '../utils';
 import { waitForElement, waitForMedia } from '../utils/study';
+import {
+	answerValueList,
+	clickCXChoice,
+	CXQuestionType,
+	fillCXCompletionTarget,
+	getCXAnswerCandidates,
+	getCXCompletionTargets,
+	getCXNativeType,
+	getCXQuestionDetails,
+	getCXQuestionType
+} from './cx-question';
 
 // @ts-ignore
 let top: Window = globalThis.top;
@@ -62,6 +72,224 @@ const state = {
 		playbackRateWarningListenerId: 0
 	}
 };
+
+const cxTextQuestionTypes: CXQuestionType[] = [
+	'completion',
+	'shortanswer',
+	'calculation',
+	'accounting',
+	'writing',
+	'other'
+];
+
+const cxCompoundQuestionTypes: CXQuestionType[] = ['cloze', 'reading', 'listening', 'shared_options', 'composite'];
+
+function renderCXElement(element: HTMLElement): string {
+	return optimizationElementWithImage(element, true).innerText.trim();
+}
+
+function cxAnswerText(value: unknown): string {
+	if (value === null || value === undefined) return '';
+	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+		return String(value).trim();
+	}
+	if (Array.isArray(value)) return value.map(cxAnswerText).filter(Boolean).join(' ');
+	if (typeof value === 'object') {
+		const item = value as Record<string, unknown>;
+		for (const key of ['right', 'answer', 'text', 'value', 'option', 'content']) {
+			if (key in item) return cxAnswerText(item[key]);
+		}
+	}
+	return '';
+}
+
+function createCXAnswerPayload(root: HTMLElement, title: string, type: CXQuestionType, options: HTMLElement[]) {
+	const nativeType = getCXNativeType(root);
+	const details = getCXQuestionDetails(root, title, nativeType, renderCXElement);
+	const optionItems = type === 'completion' || cxTextQuestionTypes.includes(type) ? [] : options.map(renderCXElement);
+	return {
+		type,
+		title,
+		option_items: optionItems,
+		options: optionItems.join('\n'),
+		...details
+	};
+}
+
+function searchCXAnswer(title: string, type: CXQuestionType, search: () => Promise<SearchInformation[]>) {
+	// OCS 的旧缓存键只有题干。复合题、共用选项、排序和匹配题的
+	// 正确答案还依赖子题/选项关系，不能用同题干缓存冒险串题。
+	if (cxCompoundQuestionTypes.includes(type) || type === 'matching' || type === 'ordering') return search();
+	return CommonProject.scripts.apps.methods.searchAnswerInCaches(title, search);
+}
+
+async function fillCXTextQuestion(
+	searchInfos: SearchInformation[],
+	root: HTMLElement,
+	configuredTargets: HTMLElement[],
+	answerSeparators: string[] = []
+) {
+	const targets = getCXCompletionTargets(root, configuredTargets);
+	if (targets.length === 0) {
+		throw new Error('已获取主观题/填空题答案，但未找到可填写的编辑框。');
+	}
+
+	const candidateSeparators = targets.length === 1 ? ['\u0000'] : answerSeparators;
+	for (const candidate of getCXAnswerCandidates(searchInfos, candidateSeparators)) {
+		let answers = answerValueList(candidate).map(cxAnswerText).filter(Boolean);
+		if (answers.length === 0) continue;
+		if (targets.length === 1 && answers.length > 1) answers = [answers.join(' ')];
+		if (answers.length !== targets.length) continue;
+
+		let filled = 0;
+		for (let index = 0; index < targets.length; index++) {
+			if (fillCXCompletionTarget(targets[index], answers[index])) filled++;
+		}
+		if (filled === targets.length) {
+			$el('[onclick*=saveQuestion]', root)?.click();
+			await $.sleep(300);
+			return { finish: true };
+		}
+	}
+	return { finish: false };
+}
+
+function getCXCompoundRows(root: HTMLElement, fallback: HTMLElement[] = []): HTMLElement[] {
+	const rows: HTMLElement[] = [];
+	for (const typeInput of Array.from(
+		root.querySelectorAll<HTMLInputElement>('input[name="readCompreHension-childType"]')
+	)) {
+		let row = typeInput.nextElementSibling?.nextElementSibling as HTMLElement | null;
+		while (row && row.tagName !== 'UL' && !row.matches('.reading_answer,.filling_answer')) {
+			row = row.nextElementSibling as HTMLElement | null;
+		}
+		if (row) rows.push(row);
+	}
+	if (rows.length === 0) {
+		rows.push(
+			...Array.from(root.querySelectorAll<HTMLElement>('.clozeBlank,.B-answerCon,.reading_answer,.filling_answer'))
+		);
+	}
+	if (rows.length === 0) rows.push(...fallback);
+	return rows.filter((row, index) => rows.indexOf(row) === index);
+}
+
+async function fillCXCompoundQuestion(
+	searchInfos: SearchInformation[],
+	root: HTMLElement,
+	fallbackRows: HTMLElement[] = [],
+	answerSeparators: string[] = []
+) {
+	const rows = getCXCompoundRows(root, fallbackRows);
+	if (rows.length === 0) {
+		return getCXCompletionTargets(root).length
+			? fillCXTextQuestion(searchInfos, root, [], answerSeparators)
+			: { finish: false };
+	}
+
+	for (const candidate of getCXAnswerCandidates(searchInfos, answerSeparators)) {
+		const answers = answerValueList(candidate);
+		if (answers.length !== rows.length) continue;
+		let completed = 0;
+		for (let index = 0; index < rows.length; index++) {
+			const row = rows[index];
+			const values = answerValueList(answers[index]);
+			const textTargets = getCXCompletionTargets(row);
+			if (textTargets.length) {
+				const texts = values.map(cxAnswerText).filter(Boolean);
+				if (texts.length !== textTargets.length) break;
+				const filled = textTargets.every((target, targetIndex) => fillCXCompletionTarget(target, texts[targetIndex]));
+				if (!filled) break;
+				completed++;
+			} else {
+				const choices = values.length ? values : [answers[index]];
+				if (!choices.every((answer) => clickCXChoice(row, answer))) break;
+				completed++;
+			}
+			await $.sleep(150);
+		}
+		if (completed === rows.length) return { finish: true };
+	}
+	return { finish: false };
+}
+
+async function fillCXMatchingQuestion(
+	searchInfos: SearchInformation[],
+	root: HTMLElement,
+	selectBoxes: HTMLElement[] = [],
+	answerSeparators: string[] = []
+) {
+	const nativeRows = Array.from(root.querySelectorAll<HTMLElement>('.selLineList > li'));
+	const rows = nativeRows.length ? nativeRows : selectBoxes;
+	if (rows.length === 0) return { finish: false };
+	let rightItems = Array.from(
+		root.querySelectorAll<HTMLElement>('.secondUlList > li,.answerList-line:nth-of-type(2) > li')
+	).map(renderCXElement);
+	if (rightItems.length === rows.length + 1 && root.querySelector('.secondUlList')) rightItems = rightItems.slice(1);
+	const normalize = (value: string) => value.replace(/[\s、,，;；:：.．()（）]/g, '').toLocaleLowerCase();
+	const answerForControl = (answer: string) => {
+		const wanted = normalize(answer);
+		const index = rightItems.findIndex((item) => {
+			const comparable = normalize(item.replace(/^[A-Z][、.．:：\s-]*/i, ''));
+			return comparable === wanted || (wanted.length > 1 && comparable.includes(wanted));
+		});
+		return index >= 0 && index < 26 ? String.fromCharCode(65 + index) : answer;
+	};
+
+	for (const candidate of getCXAnswerCandidates(searchInfos, answerSeparators)) {
+		const answers = answerValueList(candidate).map(cxAnswerText).filter(Boolean).map(answerForControl);
+		if (answers.length !== rows.length) continue;
+		let matched = 0;
+		for (let index = 0; index < rows.length; index++) {
+			const row = rows[index];
+			const select = row.matches('select')
+				? (row as HTMLSelectElement)
+				: row.querySelector<HTMLSelectElement>('select');
+			if (select) {
+				const wanted = answers[index].replace(/\s+/g, '').toLocaleLowerCase();
+				const option = Array.from(select.options).find((item) => {
+					const value = `${item.value} ${item.text}`.replace(/\s+/g, '').toLocaleLowerCase();
+					return value === wanted || value.includes(wanted);
+				});
+				if (!option) break;
+				select.value = option.value;
+				select.dispatchEvent(new Event('change', { bubbles: true }));
+				matched++;
+			} else if (clickCXChoice(row, answers[index])) {
+				matched++;
+			} else {
+				const customOption = row.querySelector<HTMLElement>(`li[data="${CSS.escape(answers[index])}"] a`);
+				if (!customOption) break;
+				customOption.click();
+				matched++;
+			}
+			await $.sleep(150);
+		}
+		if (matched === rows.length) return { finish: true };
+	}
+	return { finish: false };
+}
+
+async function fillCXOrderingQuestion(
+	searchInfos: SearchInformation[],
+	root: HTMLElement,
+	answerSeparators: string[] = []
+) {
+	const rows = Array.from(root.querySelectorAll<HTMLElement>('.sortQuesSelect > li,.sortQuesSelect li'));
+	if (rows.length === 0) return { finish: false };
+	for (const candidate of getCXAnswerCandidates(searchInfos, answerSeparators)) {
+		const answers = answerValueList(candidate).map(cxAnswerText).filter(Boolean);
+		if (answers.length !== rows.length) continue;
+		let matched = 0;
+		for (let index = 0; index < rows.length; index++) {
+			if (!clickCXChoice(rows[index], answers[index])) break;
+			matched++;
+			await $.sleep(150);
+		}
+		if (matched === rows.length) return { finish: true };
+	}
+	return { finish: false };
+}
 
 type VideoQuizStrategy = 'random' | 'ignore';
 
@@ -829,21 +1057,16 @@ function workOrExam(
 				const title = workOrExamQuestionTitleTransform(elements.title);
 				if (title) {
 					const typeInput = elements.type[0] as HTMLInputElement;
-					const type = (typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined) || 'unknown';
-					return CommonProject.scripts.apps.methods.searchAnswerInCaches(title, async () => {
+					const type = getQuestionType(parseInt(typeInput?.value || '-1'), title);
+					if (type === 'poll' || type === 'oral' || type === 'oral_evaluation') {
+						throw new Error('此题需要投票或录音作答，OCS 不会伪造答案或误报完成。');
+					}
+					return searchCXAnswer(title, type, async () => {
 						await $.sleep((period ?? 3) * 1000);
-						return defaultAnswerWrapperHandler(answererWrappers, {
-							type,
-							title,
-							option_items:
-								type === 'completion'
-									? []
-									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText),
-							options:
-								type === 'completion'
-									? ''
-									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText).join('\n')
-						});
+						return defaultAnswerWrapperHandler(
+							answererWrappers,
+							createCXAnswerPayload(ctx.root, title, type, ctx.elements.options)
+						);
 					});
 				} else {
 					throw new Error('题目为空，请查看题目是否为空，或者忽略此题');
@@ -858,74 +1081,41 @@ function workOrExam(
 
 			// 在非预览模式下会出现多个干扰项 type，这里提取正确的
 
-			const type = getQuestionType(
-				parseInt(elements.type.find((t) => t.getAttribute('name')?.match(/type\d+/))?.getAttribute('value') || '-1')
+			const nativeType = parseInt(
+				elements.type.find((t) => t.getAttribute('name')?.match(/(?:answer)?type\d+/))?.getAttribute('value') || '-1'
 			);
+			const type = getQuestionType(nativeType, workOrExamQuestionTitleTransform(elements.title));
 
-			if (type && (type === 'completion' || type === 'multiple' || type === 'judgement' || type === 'single')) {
-				const resolver = createDefaultQuestionResolver(ctx)[type];
+			if (type === 'multiple' || type === 'judgement' || type === 'single' || type === 'evaluation') {
+				const choiceType = type === 'evaluation' ? 'multiple' : type;
+				const resolver = createDefaultQuestionResolver(ctx)[choiceType];
 				return await resolver(
 					searchInfos,
 					elements.options.map((option) => optimizationElementWithImage(option)),
 					async (type, answer, option) => {
-						// 如果存在已经选择的选项
-						if (type === 'judgement' || type === 'single' || type === 'multiple') {
-							if (option?.parentElement && $$el('[class*="check_answer"]', option.parentElement).length === 0) {
-								option.click();
-								await $.sleep(500);
-							}
-						} else if (type === 'completion' && answer.trim()) {
-							const text = option?.querySelector('textarea');
-							const textareaFrame = option?.querySelector('iframe');
-							if (text) {
-								text.value = answer;
-							}
-							if (textareaFrame?.contentDocument) {
-								textareaFrame.contentDocument.body.innerHTML = answer;
-							}
-							if (option?.parentElement?.parentElement) {
-								/** 如果存在保存按钮则点击 */
-								$el('[onclick*=saveQuestion]', option?.parentElement?.parentElement)?.click();
-								await $.sleep(500);
-							}
+						if (option?.parentElement && $$el('[class*="check_answer"]', option.parentElement).length === 0) {
+							option.click();
+							await $.sleep(500);
 						}
 					}
 				);
 			}
-			// 连线题自定义处理
-			else if (type && type === 'line') {
-				for (const answers of searchInfos.map((info) => info.results.map((res) => res.answer))) {
-					let ans = answers;
-					if (ans.length === 1) {
-						ans = splitAnswer(ans[0]);
-					}
-					if (
-						ans.filter(Boolean).length !== 0 &&
-						elements.lineAnswerInput &&
-						ans.filter(Boolean).length === elements.lineSelectBox.length
-					) {
-						//  选择答案
-						for (let index = 0; index < elements.lineSelectBox.length; index++) {
-							const box = elements.lineSelectBox[index];
-							if (ans[index]) {
-								$el(`li[data=${ans[index]}] a`, box)?.click();
-								await $.sleep(200);
-							}
-						}
-
-						return { finish: true };
-					}
-				}
-
-				return { finish: false };
+			if (cxTextQuestionTypes.includes(type)) {
+				return fillCXTextQuestion(searchInfos, ctx.root, elements.options, ctx.answerSeparators);
 			}
-			// 完形填空
-			else if (type && type === 'fill') {
-				return readerAndFillHandle(searchInfos, elements.filling);
+			if (type === 'matching') {
+				return fillCXMatchingQuestion(searchInfos, ctx.root, elements.lineSelectBox, ctx.answerSeparators);
 			}
-			// 阅读理解
-			else if (type && type === 'reader') {
-				return readerAndFillHandle(searchInfos, elements.reading);
+			if (cxCompoundQuestionTypes.includes(type)) {
+				return fillCXCompoundQuestion(
+					searchInfos,
+					ctx.root,
+					[...elements.filling, ...elements.reading],
+					ctx.answerSeparators
+				);
+			}
+			if (type === 'ordering') {
+				return fillCXOrderingQuestion(searchInfos, ctx.root, ctx.answerSeparators);
 			}
 
 			return { finish: false };
@@ -1895,22 +2085,17 @@ const JobRunner = {
 				const title = chapterTestTaskQuestionTitleTransform(elements.title);
 				if (title) {
 					const typeInput = elements.type[0] as HTMLInputElement;
-					const type = (typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined) || 'unknown';
+					const type = getQuestionType(parseInt(typeInput?.value || '-1'), title);
+					if (type === 'poll' || type === 'oral' || type === 'oral_evaluation') {
+						throw new Error('此题需要投票或录音作答，OCS 不会伪造答案或误报完成。');
+					}
 
-					return CommonProject.scripts.apps.methods.searchAnswerInCaches(title, async () => {
+					return searchCXAnswer(title, type, async () => {
 						await $.sleep((period ?? 3) * 1000);
-						return defaultAnswerWrapperHandler(answererWrappers, {
-							type,
-							title,
-							option_items:
-								type === 'completion'
-									? []
-									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText),
-							options:
-								type === 'completion'
-									? ''
-									: ctx.elements.options.map((o) => optimizationElementWithImage(o, true).innerText).join('\n')
-						});
+						return defaultAnswerWrapperHandler(
+							answererWrappers,
+							createCXAnswerPayload(ctx.root, title, type, ctx.elements.options)
+						);
 					});
 				} else {
 					throw new Error('题目为空，请查看题目是否为空，或者忽略此题');
@@ -1920,36 +2105,23 @@ const JobRunner = {
 			work: async (ctx) => {
 				const { elements, searchInfos } = ctx;
 				const typeInput = elements.type[0] as HTMLInputElement;
-				const type = typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined;
+				const type = getQuestionType(
+					parseInt(typeInput?.value || '-1'),
+					chapterTestTaskQuestionTitleTransform(elements.title)
+				);
 
-				if (type && (type === 'completion' || type === 'multiple' || type === 'judgement' || type === 'single')) {
-					const resolver = createDefaultQuestionResolver(ctx)[type];
+				if (type === 'multiple' || type === 'judgement' || type === 'single' || type === 'evaluation') {
+					const choiceType = type === 'evaluation' ? 'multiple' : type;
+					const resolver = createDefaultQuestionResolver(ctx)[choiceType];
 
 					const handler: DefaultWork<any>['handler'] = (type, answer, option, ctx) => {
-						if (type === 'judgement' || type === 'single' || type === 'multiple') {
-							// 检查是否已经选择
-							const checked =
-								option?.parentElement?.querySelector('label input')?.getAttribute('checked') === 'checked' ||
-								// 适配2023/9月最新版本
-								option?.parentElement?.getAttribute('aria-checked') === 'true';
-							if (checked) {
-								// 跳过
-							} else {
-								option?.click();
-							}
-						} else if (type === 'completion' && answer.trim()) {
-							const text = option?.parentElement?.querySelector('textarea');
-							const textareaFrame = option?.parentElement?.querySelector('iframe');
-							if (text) {
-								text.value = answer;
-							}
-							if (textareaFrame?.contentDocument) {
-								textareaFrame.contentDocument.body.innerHTML = answer;
-							}
-							if (option?.parentElement?.parentElement) {
-								/** 如果存在保存按钮则点击 */
-								$el('[onclick*=saveQuestion]', option.parentElement.parentElement)?.click();
-							}
+						// 检查是否已经选择
+						const checked =
+							option?.parentElement?.querySelector('label input')?.getAttribute('checked') === 'checked' ||
+							// 适配2023/9月最新版本
+							option?.parentElement?.getAttribute('aria-checked') === 'true';
+						if (!checked) {
+							option?.click();
 						}
 					};
 
@@ -1959,37 +2131,17 @@ const JobRunner = {
 						handler
 					);
 				}
-				// 连线题自定义处理
-				else if (type && type === 'line') {
-					const select = (el: HTMLElement, opt_val: string) => {
-						const selected = el.querySelector(`option[selected]`);
-						const opt = el.querySelector(`option[value="${opt_val}"]`);
-						selected?.removeAttribute('selected');
-						if (opt) {
-							opt.setAttribute('selected', '');
-						}
-					};
-
-					for (const answers of searchInfos.map((info) => info.results.map((res) => res.answer))) {
-						for (const ans of answers) {
-							const splited_ans = splitAnswer(ans);
-							if (splited_ans.length !== 0 && elements.lineSelectBox.length === splited_ans.length) {
-								//  选择答案
-								for (let index = 0; index < elements.lineSelectBox.length; index++) {
-									const box = elements.lineSelectBox[index];
-									if (splited_ans[index]) {
-										select(box, splited_ans[index]);
-										const text = box.parentElement?.querySelector('.chosen-single span');
-										if (text) text.textContent = splited_ans[index];
-										await $.sleep(200);
-									}
-								}
-								return { finish: true };
-							}
-						}
-					}
-
-					return { finish: false };
+				if (cxTextQuestionTypes.includes(type)) {
+					return fillCXTextQuestion(searchInfos, ctx.root, elements.options, ctx.answerSeparators);
+				}
+				if (type === 'matching') {
+					return fillCXMatchingQuestion(searchInfos, ctx.root, elements.lineSelectBox, ctx.answerSeparators);
+				}
+				if (cxCompoundQuestionTypes.includes(type)) {
+					return fillCXCompoundQuestion(searchInfos, ctx.root, [], ctx.answerSeparators);
+				}
+				if (type === 'ordering') {
+					return fillCXOrderingQuestion(searchInfos, ctx.root, ctx.answerSeparators);
 				}
 
 				return { finish: false };
@@ -2013,36 +2165,32 @@ const JobRunner = {
 					const options = curr.ctx?.elements?.options || [];
 
 					const typeInput = curr.ctx?.elements?.type[0] as HTMLInputElement | undefined;
-					const type = typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined;
+					const type = getQuestionType(
+						parseInt(typeInput?.value || '-1'),
+						chapterTestTaskQuestionTitleTransform(curr.ctx?.elements?.title || [])
+					);
 
 					const commonSetting = CommonProject.scripts.settings.cfg;
 
 					if (
 						commonSetting['randomWork-choice'] &&
-						(type === 'judgement' || type === 'single' || type === 'multiple')
+						(type === 'judgement' || type === 'single' || type === 'multiple' || type === 'evaluation')
 					) {
 						$console.log('正在随机作答');
 
 						const option = options[Math.floor(Math.random() * options.length)];
 						// @ts-ignore 随机选择选项
 						option?.parentElement?.querySelector('a,label')?.click();
-					} else if (commonSetting['randomWork-complete'] && type === 'completion') {
+					} else if (commonSetting['randomWork-complete'] && cxTextQuestionTypes.includes(type)) {
 						$console.log('正在随机作答');
 
 						// 随机填写答案
-						for (const option of options) {
-							const textarea = option?.parentElement?.querySelector('textarea');
+						for (const option of getCXCompletionTargets(curr.ctx!.root, options)) {
 							const completeTexts = commonSetting['randomWork-completeTexts-textarea'].split('\n').filter(Boolean);
 							const text = completeTexts[Math.floor(Math.random() * completeTexts.length)];
-							const textareaFrame = option?.parentElement?.querySelector('iframe');
 
 							if (text) {
-								if (textarea) {
-									textarea.value = text;
-								}
-								if (textareaFrame?.contentDocument) {
-									textareaFrame.contentDocument.body.innerHTML = text;
-								}
+								fillCXCompletionTarget(option, text);
 							} else {
 								$console.error('请设置随机填空的文案');
 							}
@@ -2054,7 +2202,7 @@ const JobRunner = {
 			},
 			async onElementSearched(elements) {
 				const typeInput = elements.type[0] as HTMLInputElement;
-				const type = typeInput ? getQuestionType(parseInt(typeInput.value)) : undefined;
+				const type = getQuestionType(parseInt(typeInput?.value || '-1'), elements.title?.[0]?.innerText || '');
 
 				/** 判断题转换成文字，以便于答题程序判断 */
 				if (type === 'judgement') {
@@ -2167,63 +2315,30 @@ const JobRunner = {
  * cx 题目类型 ：
  * 0 单选题
  * 1 多选题
- * 2 简答题
+ * 2 填空题
  * 3 判断题
- * 4 填空题
+ * 4 简答题
  * 5 名词解释
  * 6 论述题
  * 7 计算题
- * 8 其他题(大概率是填空题)
+ * 8 其他题
  * 9 分录题
  * 10 资料题
  * 11 连线题
+ * 12 投票题
+ * 13 排序题
  * 14 完形填空
  * 15 阅读理解
+ * 16/17 旧页面的共用选项/复合题别名
+ * 18 口语题
+ * 19 听力题
+ * 20 共用选项题
+ * 21 测评题
+ * 22 口语测评题
+ * 26 写作题
  */
-function getQuestionType(
-	val: number
-): 'single' | 'multiple' | 'judgement' | 'completion' | 'line' | 'fill' | 'reader' | undefined {
-	return val === 0
-		? 'single'
-		: val === 1
-		? 'multiple'
-		: val === 3
-		? 'judgement'
-		: [2, 4, 5, 6, 7, 8, 9, 10].some((t) => t === val)
-		? 'completion'
-		: val === 11
-		? 'line'
-		: val === 14
-		? 'fill'
-		: val === 15
-		? 'reader'
-		: undefined;
-}
-
-/** 阅读理解和完形填空的共同处理器 */
-async function readerAndFillHandle(searchInfos: SearchInformation[], list: HTMLElement[]) {
-	for (const answers of searchInfos.map((info) => info.results.map((res) => res.answer))) {
-		let ans = answers;
-
-		if (ans.length === 1) {
-			ans = splitAnswer(ans[0]);
-		}
-
-		if (ans.filter(Boolean).length !== 0 && list.length !== 0) {
-			for (let index = 0; index < ans.length; index++) {
-				const item = list[index];
-				if (item) {
-					/** 获取每个小题中的准确答案选项 并点击 */
-					$el(`span.saveSingleSelect[data="${ans[index]}"]`, item)?.click();
-					await $.sleep(200);
-				}
-			}
-
-			return { finish: true };
-		}
-	}
-
-	return { finish: false };
+function getQuestionType(val: number, label = ''): CXQuestionType {
+	return getCXQuestionType(val, label);
 }
 
 function hasFaceRecognition() {

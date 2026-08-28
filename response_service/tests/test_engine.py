@@ -149,6 +149,64 @@ class OCSResponseEngineTests(unittest.TestCase):
         )
         self.assertEqual(answer, "2#1")
 
+    def test_structured_compound_context_and_images_are_preserved(self):
+        question = normalize_question(
+            {
+                "title": "阅读材料",
+                "type": "reading",
+                "material": "材料图 https://cx.test/material.png",
+                "subquestions": [
+                    {
+                        "id": "child-1",
+                        "type": "single",
+                        "title": "子题图 https://cx.test/child.png",
+                        "options": ["甲", "乙 https://cx.test/child-b.png"],
+                    }
+                ],
+                "images": [
+                    {"source_url": "https://cx.test/material.png", "data_url": PIXEL},
+                    {"source_url": "https://cx.test/child.png", "data_url": PIXEL},
+                    {"source_url": "https://cx.test/child-b.png", "data_url": PIXEL},
+                ],
+            }
+        )
+        self.assertIn("[material图片 1]", question.context["material"])
+        self.assertIn("[subquestions 1/title图片 1]", question.context["subquestions"][0]["title"])
+        self.assertIn("[subquestions 1/options 2图片 1]", question.context["subquestions"][0]["options"][1])
+        self.assertEqual(len(question.attachments), 3)
+
+    def test_flat_and_structured_reference_to_same_image_is_sent_once(self):
+        question = normalize_question(
+            {
+                "title": "阅读",
+                "type": "reading",
+                "option_items": ["甲 https://cx.test/shared.png"],
+                "subquestions": [{"title": "子题", "options": ["甲 https://cx.test/shared.png"]}],
+                "images": [{"source_url": "https://cx.test/shared.png", "data_url": PIXEL}],
+            }
+        )
+        self.assertEqual(len(question.attachments), 1)
+        self.assertIn("选项 A 图片 1", question.attachments[0].label)
+        self.assertIn("subquestions 1/options 1 图片 1", question.attachments[0].label)
+
+    def test_compound_nested_answers_stay_json_for_browser_binding(self):
+        engine = OCSResponseEngine(settings())
+        question = normalize_question({"title": "阅读", "type": "reading"})
+        answer = engine.format_ocs_answer(
+            [{"answer": "A"}, {"answer": ["B", "D"]}, {"answer": "正文"}],
+            question,
+        )
+        self.assertEqual(json.loads(answer), [{"answer": "A"}, {"answer": ["B", "D"]}, {"answer": "正文"}])
+
+    def test_matching_alias_flattens_pairs(self):
+        engine = OCSResponseEngine(settings())
+        question = normalize_question({"title": "匹配", "type": "matching"})
+        answer = engine.format_ocs_answer(
+            {"pairs": [{"left": "甲", "right": "B"}, {"left": "乙", "right": "A"}]},
+            question,
+        )
+        self.assertEqual(answer, "B#A")
+
 
 if __name__ == "__main__":
     unittest.main()

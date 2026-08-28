@@ -51,6 +51,7 @@ class NormalizedQuestion:
     title: str
     options: tuple[str, ...]
     attachments: tuple[Attachment, ...]
+    context: Mapping[str, Any]
 
 
 def _option_label(index: int) -> str:
@@ -115,6 +116,57 @@ def normalize_question(payload: Mapping[str, Any]) -> NormalizedQuestion:
         for image_index, url in enumerate(URL_PATTERN.findall(option), 1):
             discovered.append(Attachment(label=f"选项 {letter} 图片 {image_index}", source_url=url))
 
+    context_keys = (
+        "material",
+        "subquestions",
+        "shared_options",
+        "matching_groups",
+        "native_type",
+        "blank_count",
+        "underline_count",
+    )
+    raw_context = {key: payload.get(key) for key in context_keys if payload.get(key) not in (None, "", [], {})}
+
+    def normalize_context(value: Any, scope: str) -> Any:
+        if isinstance(value, Mapping):
+            return {
+                str(key): normalize_context(item, f"{scope}/{key}")
+                for key, item in value.items()
+            }
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            return [normalize_context(item, f"{scope} {index + 1}") for index, item in enumerate(value)]
+        if not isinstance(value, str):
+            return value
+        urls = URL_PATTERN.findall(value)
+        for index, url in enumerate(urls, 1):
+            discovered.append(Attachment(label=f"{scope} 图片 {index}", source_url=url))
+        url_index = 0
+
+        def replace_url(_: re.Match[str]) -> str:
+            nonlocal url_index
+            url_index += 1
+            return f"[{scope}图片 {url_index}]"
+
+        return _normalize_blanks(URL_PATTERN.sub(replace_url, value))
+
+    context = {key: normalize_context(value, key) for key, value in raw_context.items()}
+
+    # Flat OCS options and structured subquestions may reference the same URL.
+    # Send one image attachment with all semantic labels instead of downloading
+    # and billing the same image twice.
+    deduplicated: list[Attachment] = []
+    discovered_by_url: dict[str, int] = {}
+    for item in discovered:
+        existing_index = discovered_by_url.get(item.source_url)
+        if existing_index is None:
+            discovered_by_url[item.source_url] = len(deduplicated)
+            deduplicated.append(item)
+            continue
+        existing = deduplicated[existing_index]
+        labels = list(dict.fromkeys([*existing.label.split("；"), item.label]))
+        deduplicated[existing_index] = Attachment(label="；".join(labels), source_url=item.source_url)
+    discovered = deduplicated
+
     supplied_by_url: dict[str, list[Attachment]] = {}
     for item in supplied:
         if item.source_url:
@@ -158,6 +210,7 @@ def normalize_question(payload: Mapping[str, Any]) -> NormalizedQuestion:
         title=title,
         options=options,
         attachments=tuple(attachments),
+        context=context,
     )
 
 
@@ -226,7 +279,15 @@ class OCSResponseEngine:
     def build_request(self, payload: Mapping[str, Any]) -> tuple[dict[str, Any], NormalizedQuestion, list[str]]:
         question = normalize_question(payload)
         prepared, warnings = self._prepare_attachments(question)
-        blank_count = len(re.findall(r"\[BLANK_\d+\]", question.title, re.IGNORECASE))
+        explicit_blank_count = question.context.get("blank_count", 0)
+        try:
+            explicit_blank_count = int(explicit_blank_count)
+        except (TypeError, ValueError):
+            explicit_blank_count = 0
+        blank_count = max(
+            explicit_blank_count,
+            len(re.findall(r"\[BLANK_\d+\]", question.title, re.IGNORECASE)),
+        )
         completion_hint = (
             "填空题 answer 返回按 [BLANK_n] 顺序排列的字符串数组"
             if blank_count
@@ -235,11 +296,27 @@ class OCSResponseEngine:
         shape_hint = {
             "single": "单选题 answer 返回选项字母，例如 A",
             "multiple": "多选题 answer 返回选项字母数组，例如 [\"A\", \"C\"]",
+            "evaluation": "测评选择题 answer 返回选项字母数组，例如 [\"A\", \"C\"]",
             "judgement": "判断题 answer 只返回 正确 或 错误",
             "completion": completion_hint,
+            "shortanswer": "简答、名词解释或论述题 answer 直接返回可填写正文",
+            "calculation": "计算题 answer 直接返回可填写的计算过程和结果正文",
+            "accounting": "分录题 answer 返回按作答区顺序排列的字符串数组",
+            "writing": "写作题 answer 直接返回可填写正文",
+            "other": completion_hint,
             "fill": "完形填空 answer 返回各小题选项字母的顺序数组",
+            "cloze": "完形填空 answer 返回各小题选项字母的顺序数组",
             "line": "连线或匹配题 answer 返回按左侧项目顺序排列的右侧值数组",
-            "reader": "阅读理解 answer 返回各小题选项字母的顺序数组",
+            "matching": "连线或匹配题 answer 返回 pairs 数组，每项包含 left 和 right",
+            "ordering": "排序题 answer 返回按正确顺序排列的选项字母或选项文本数组",
+            "reader": "阅读理解 answer 按子题顺序返回答案数组；混合题型可返回带 answer 的对象数组",
+            "reading": "阅读理解 answer 按子题顺序返回答案数组；混合题型可返回带 answer 的对象数组",
+            "listening": "听力复合题 answer 按子题顺序返回答案数组；混合题型可返回带 answer 的对象数组",
+            "shared_options": "共用选项题 answer 按子题顺序返回所选共用选项字母或文本数组",
+            "composite": "资料/复合题 answer 按 subquestions 顺序返回答案数组，必须保留每个子题的答案结构",
+            "poll": "投票题没有唯一知识答案，不要臆造；answer 返回空字符串",
+            "oral": "口语题需要录音作答，answer 返回空字符串",
+            "oral_evaluation": "口语测评需要录音作答，answer 返回空字符串",
         }.get(question.question_type, "按题目要求返回字符串、数组或保留对应关系的对象")
         instructions = (
             "你是 OCS 的课程题目答题服务。只输出 JSON 对象 "
@@ -256,6 +333,7 @@ class OCSResponseEngine:
                 for index, option in enumerate(question.options)
             ],
         }
+        user_payload.update(question.context)
         content: list[dict[str, Any]] = [
             {"type": "input_text", "text": json.dumps(user_payload, ensure_ascii=False)}
         ]
@@ -303,18 +381,27 @@ class OCSResponseEngine:
         return decoded.get("answer"), max(0.0, min(1.0, float(confidence)))
 
     def format_ocs_answer(self, answer: Any, question: NormalizedQuestion) -> str:
+        compound_types = {"reader", "reading", "listening", "composite"}
         if isinstance(answer, Mapping):
             if "options" in answer:
                 answer = answer["options"]
             elif "text" in answer:
                 answer = answer["text"]
-            elif question.question_type == "line" and "pairs" in answer:
+            elif question.question_type in {"line", "matching"} and "pairs" in answer:
                 answer = answer["pairs"]
-            elif question.question_type == "line":
+            elif question.question_type in {"line", "matching"}:
                 answer = list(answer.values())
+            elif question.question_type in compound_types:
+                return json.dumps(answer, ensure_ascii=False, separators=(",", ":"))
             else:
                 return json.dumps(answer, ensure_ascii=False, separators=(",", ":"))
         if isinstance(answer, Sequence) and not isinstance(answer, (str, bytes, bytearray)):
+            if question.question_type in compound_types and any(
+                isinstance(item, Mapping)
+                or (isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)))
+                for item in answer
+            ):
+                return json.dumps(answer, ensure_ascii=False, separators=(",", ":"))
             values: list[str] = []
             for item in answer:
                 if isinstance(item, Mapping):
@@ -331,7 +418,7 @@ class OCSResponseEngine:
             matched = re.fullmatch(r"\s*([A-Z])(?:[.、:：)）])?\s*", text, re.IGNORECASE)
             if matched:
                 return matched.group(1).upper()
-        if question.question_type == "multiple":
+        if question.question_type in {"multiple", "evaluation"}:
             letters = re.findall(r"[A-Z]", text.upper())
             if letters and re.fullmatch(r"[\sA-Z,，、#;；|]+", text.upper()):
                 return self.settings.answer_separator.join(dict.fromkeys(letters))

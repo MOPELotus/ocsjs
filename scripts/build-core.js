@@ -141,7 +141,7 @@ async function createUserJs() {
 	const forkRawRoot = process.env.OCS_FORK_RAW_ROOT || 'https://raw.githubusercontent.com/MOPELotus/ocsjs/dist';
 	Object.assign(commonOpts.metadata, {
 		name: 'OCS 网课助手 - MOPELotus 全域名修改版',
-		version: process.env.OCS_BUILD_VERSION || `${version}.1`,
+		version: process.env.OCS_BUILD_VERSION || `${version}-fork.1`,
 		namespace: 'https://github.com/MOPELotus/ocsjs',
 		homepage: 'https://github.com/MOPELotus/ocsjs',
 		source: 'https://github.com/MOPELotus/ocsjs',
