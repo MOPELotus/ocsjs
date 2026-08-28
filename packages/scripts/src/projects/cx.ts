@@ -133,7 +133,24 @@ async function fillCXTextQuestion(
 	configuredTargets: HTMLElement[],
 	answerSeparators: string[] = []
 ) {
-	let targets = getCXCompletionTargets(root, configuredTargets);
+	let activeRoot = root;
+	let activeConfiguredTargets = configuredTargets;
+	let targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
+	/** 超星点击“修改答案”时可能整块替换 .TiMu，旧 root 会变成脱离文档的快照。 */
+	if (targets.length === 0 && root.ownerDocument) {
+		const rootData = root.getAttribute('data');
+		const candidates = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>('.TiMu,.questionLi,.singleQuesId'));
+		const current = candidates.find(
+			(candidate) =>
+				candidate !== root &&
+				((rootData && candidate.getAttribute('data') === rootData) || getCXCompletionTargets(candidate).length > 0)
+		);
+		if (current) {
+			activeRoot = current;
+			activeConfiguredTargets = [];
+			targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
+		}
+	}
 	/**
 	 * 已提交/待批阅的章节作业会先渲染为只读答案，并把编辑器隐藏在“修改答案”
 	 * 按钮之后。答题器可能比用户点击按钮更早启动，因此这里主动进入编辑态，
@@ -141,7 +158,7 @@ async function fillCXTextQuestion(
 	 */
 	if (targets.length === 0) {
 		const editTrigger = Array.from(
-			root.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
+			activeRoot.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
 		).find((element) =>
 			/修改答案|编辑答案|重新作答/.test((element.innerText || (element as HTMLInputElement).value || '').trim())
 		);
@@ -149,7 +166,17 @@ async function fillCXTextQuestion(
 			editTrigger.click();
 			for (let attempt = 0; attempt < 20; attempt++) {
 				await $.sleep(200);
-				targets = getCXCompletionTargets(root, configuredTargets);
+				targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
+				if (targets.length === 0 && root.ownerDocument) {
+					const current = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>('.TiMu,.questionLi,.singleQuesId')).find(
+						(candidate) => candidate !== activeRoot && getCXCompletionTargets(candidate).length > 0
+					);
+					if (current) {
+						activeRoot = current;
+						activeConfiguredTargets = [];
+						targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
+					}
+				}
 				if (targets.length > 0) break;
 			}
 		}
@@ -180,7 +207,7 @@ async function fillCXTextQuestion(
 			if (fillCXCompletionTarget(targets[index], answers[index])) filled++;
 		}
 		if (filled === targets.length) {
-			$el('[onclick*=saveQuestion]', root)?.click();
+			$el('[onclick*=saveQuestion]', activeRoot)?.click();
 			await $.sleep(300);
 			return { finish: true };
 		}
