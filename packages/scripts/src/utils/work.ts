@@ -256,7 +256,7 @@ export function optimizationElementWithImage(root: HTMLElement, clone_node: bool
 	}
 	for (const node of textNodes) {
 		node.nodeValue = String(node.nodeValue || '').replace(
-			/([（(\[])[\u00a0 \t]{2,}([）)\]])|_{2,}|＿{2,}|﹍{2,}/g,
+			/([（(\x5b])[\u00a0 \t]{2,}([）)\x5d])|_{2,}|＿{2,}|﹍{2,}/g,
 			(_matched, open, close) =>
 				open ? `${open}[BLANK_${++blankIndex}]${close}` : ` [BLANK_${++blankIndex}] `
 		);

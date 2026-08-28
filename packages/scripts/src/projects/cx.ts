@@ -2057,7 +2057,7 @@ const JobRunner = {
 		const frameWindow = frame.contentWindow!;
 		const frameApi = frameWindow as any;
 		const { TiMu: initialTiMu } = domSearchAll({ TiMu: '.TiMu' }, frameWindow!.document);
-		let worker: OCSWorker<any> | undefined;
+		const workerRef: { current?: OCSWorker<any> } = {};
 		let restartRequested = false;
 		let restartEventName: string | undefined;
 		if (showRestartButton) {
@@ -2077,7 +2077,7 @@ const JobRunner = {
 					};
 				}
 				restartRequested = true;
-				worker?.emit('close');
+				workerRef.current?.emit('close');
 				await $.sleep(100);
 				try {
 					const result = await JobRunner.chapter(frame, options);
@@ -2312,7 +2312,7 @@ const JobRunner = {
 			}
 		});
 
-		worker = chapterWorker;
+		workerRef.current = chapterWorker;
 		let results;
 		try {
 			results = await chapterWorker.doWork();
