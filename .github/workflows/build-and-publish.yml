@@ -32,7 +32,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          npm install pnpm -g
+          npm install pnpm@9.15.9 -g
           pnpm install -w
           cd packages/scripts && pnpm install && cd ../../
           npm run tsc
