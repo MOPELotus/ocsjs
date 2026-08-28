@@ -155,6 +155,16 @@ async function fillCXTextQuestion(
 		}
 	}
 	if (targets.length === 0) {
+		$console.error('CX 简答题编辑框解析失败', {
+			root: `${root.tagName}#${root.id}.${root.className}`,
+			configured: configuredTargets.length,
+			controls: root.querySelectorAll(
+				'textarea,input[type="text"],input:not([type]),iframe,[contenteditable="true"],.textDIV,.eidtDiv,.editDiv'
+			).length,
+			editButtons: Array.from(root.querySelectorAll('a,button,input[type="button"],input[type="submit"]')).map(
+				(element) => (element.innerText || (element as HTMLInputElement).value || '').trim()
+			)
+		});
 		throw new Error('已获取主观题/填空题答案，但未找到可填写的编辑框。');
 	}
 
