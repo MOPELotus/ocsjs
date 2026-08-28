@@ -145,10 +145,10 @@ async function fillCXTextQuestion(
 	let activeRoot = root;
 	let activeConfiguredTargets = configuredTargets;
 	let targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
+	const questionStem = normalizedCXQuestionStem(root);
 	/** 超星点击“修改答案”时可能整块替换 .TiMu，旧 root 会变成脱离文档的快照。 */
 	if (targets.length === 0 && root.ownerDocument) {
 		const rootData = root.getAttribute('data');
-		const questionStem = normalizedCXQuestionStem(root);
 		const candidates = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>('.TiMu,.questionLi,.singleQuesId'));
 		const current = candidates.find((candidate) => {
 			if (candidate === root || getCXCompletionTargets(candidate).length === 0) return false;
@@ -174,7 +174,12 @@ async function fillCXTextQuestion(
 			activeRoot.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
 		).find((element) =>
 			/修改答案|编辑答案|重新作答/.test((element.innerText || (element as HTMLInputElement).value || '').trim())
-		);
+		) ||
+			Array.from(
+				activeRoot.ownerDocument.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
+			).find((element) =>
+				/修改答案|编辑答案|重新作答/.test((element.innerText || (element as HTMLInputElement).value || '').trim())
+			);
 		if (editTrigger) {
 			editTrigger.click();
 			for (let attempt = 0; attempt < 20; attempt++) {
@@ -182,7 +187,11 @@ async function fillCXTextQuestion(
 				targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
 				if (targets.length === 0 && root.ownerDocument) {
 					const current = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>('.TiMu,.questionLi,.singleQuesId')).find(
-						(candidate) => candidate !== activeRoot && getCXCompletionTargets(candidate).length > 0
+						(candidate) => {
+							if (candidate === activeRoot || getCXCompletionTargets(candidate).length === 0) return false;
+							const candidateStem = normalizedCXQuestionStem(candidate);
+							return !questionStem || !candidateStem || candidateStem.includes(questionStem) || questionStem.includes(candidateStem);
+						}
 					);
 					if (current) {
 						activeRoot = current;
@@ -2093,6 +2102,7 @@ const JobRunner = {
 		const visual_state = CommonProject.scripts.render.cfg.visual;
 
 		const frameWindow = frame.contentWindow;
+		const frameApi = frameWindow as any;
 		const { TiMu } = domSearchAll({ TiMu: '.TiMu' }, frameWindow!.document);
 
 		// 最大化面板
@@ -2318,19 +2328,27 @@ const JobRunner = {
 
 				if (uploadable) {
 					// @ts-ignore 提交
-					frameWindow.btnBlueSubmit();
+					if (typeof frameApi.btnBlueSubmit === 'function') frameApi.btnBlueSubmit();
+					else if (typeof frameApi.submitHomework === 'function') frameApi.submitHomework();
 
 					await $.sleep(3000);
 					/** 确定按钮 */
 					// @ts-ignore 确定
-					frameWindow.submitCheckTimes();
+					if (typeof frameApi.submitCheckTimes === 'function') frameApi.submitCheckTimes();
 					// @ts-ignore 2024/4 更新后上方函数无法关闭弹窗，需要手动关闭确定弹窗
 					top.$('#workpop').hide();
 				} else {
 					// @ts-ignore 禁止弹窗
 					frameWindow.alert = () => {};
 					// @ts-ignore 暂时保存
-					frameWindow.noSubmit();
+					if (typeof frameApi.noSubmit === 'function') frameApi.noSubmit();
+					else if (typeof frameApi.saveAnswer === 'function') frameApi.saveAnswer();
+					else {
+						const saveButton = frameApi.document.querySelector(
+							'[onclick*="save"],button:not([type="submit"]),input[type="button"]'
+						) as HTMLElement | null;
+						saveButton?.click();
+					}
 				}
 			}
 		});
