@@ -233,32 +233,8 @@ export function getCXCompletionTargets(root: HTMLElement, configured: HTMLElemen
 	);
 }
 
-const cxEditTriggerPattern = /修改答案|编辑答案|重新作答/;
 const cxEditableControlSelector =
 	'iframe[id^="ueditor_"],.edui-editor iframe,textarea[id^="answer"],textarea[name^="answer"],textarea:not([readonly]):not([disabled]),input[type="text"]:not([readonly]):not([disabled]),input:not([type]):not([readonly]):not([disabled]),select:not([disabled]),input[type="radio"]:not([disabled]),input[type="checkbox"]:not([disabled]),[contenteditable="true"]';
-
-function cxControlText(element: HTMLElement): string {
-	return [
-		element.innerText,
-		element.textContent,
-		(element as HTMLInputElement).value,
-		element.getAttribute('aria-label'),
-		element.getAttribute('title')
-	]
-		.filter(Boolean)
-		.join(' ')
-		.trim();
-}
-
-/** Find the visible Chaoxing control that switches a submitted question into edit mode. */
-export function findCXEditTrigger(root: HTMLElement | Document): HTMLElement | undefined {
-	return Array.from(
-		root.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
-	).find((element) => {
-		if (element.hidden || element.getAttribute('aria-hidden') === 'true') return false;
-		return cxEditTriggerPattern.test(cxControlText(element));
-	});
-}
 
 /**
  * A submitted chapter test is rendered as a saved-answer block. It has no writable

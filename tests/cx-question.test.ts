@@ -5,7 +5,6 @@ import {
 	getCXCompletionTargets,
 	getCXQuestionType,
 	resolveCXQuestionType,
-	findCXEditTrigger,
 	isCXQuestionReadOnly,
 	hasCXEditableControls
 } from '../packages/scripts/src/projects/cx-question';
@@ -94,9 +93,5 @@ const choiceRoot = document.createElement('div');
 choiceRoot.className = 'TiMu';
 choiceRoot.innerHTML = '<div>我的答案：A</div><label><input type="radio" name="choice"></label>';
 equal(isCXQuestionReadOnly(choiceRoot), false, 'editable choice question is not read-only');
-
-const editDocument = document.implementation.createHTMLDocument('chapter');
-editDocument.body.innerHTML = '<a id="edit">修改答案</a>';
-equal(findCXEditTrigger(editDocument)?.id, 'edit', 'find Chaoxing edit trigger');
 
 console.log(`\n  ✅ ${passed} Chaoxing question-shape tests passed\n`);

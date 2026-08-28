@@ -38,8 +38,6 @@ import {
 	getCXCompletionTargets,
 	getCXNativeType,
 	getCXQuestionDetails,
-	findCXEditTrigger,
-	hasCXEditableControls,
 	isCXQuestionReadOnly,
 	resolveCXQuestionType
 } from './cx-question';
@@ -87,6 +85,9 @@ const cxTextQuestionTypes: CXQuestionType[] = [
 
 const cxCompoundQuestionTypes: CXQuestionType[] = ['cloze', 'reading', 'listening', 'shared_options', 'composite'];
 
+/** 当前章节测试的手动重新答题事件；使用一次性事件名隔离其它 iframe。 */
+let activeCXChapterRestartEvent: string | undefined;
+
 function renderCXElement(element: HTMLElement): string {
 	return optimizationElementWithImage(element, true).innerText.trim();
 }
@@ -104,15 +105,6 @@ function cxAnswerText(value: unknown): string {
 		}
 	}
 	return '';
-}
-
-function normalizedCXQuestionStem(root: HTMLElement): string {
-	const title = root.querySelector<HTMLElement>('.Zy_TItle .clearfix,.splitS-left .mark_name')?.innerText || root.innerText;
-	return title
-		.replace(/【[^】]+】/g, '')
-		.replace(/^\s*\d+\s*[。、.)]?\s*/, '')
-		.replace(/\s+/g, '')
-		.trim();
 }
 
 function createCXAnswerPayload(root: HTMLElement, title: string, type: CXQuestionType, options: HTMLElement[]) {
@@ -145,70 +137,10 @@ async function fillCXTextQuestion(
 	configuredTargets: HTMLElement[],
 	answerSeparators: string[] = []
 ) {
-	let activeRoot = root;
-	let activeConfiguredTargets = configuredTargets;
-	let targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
-	const questionStem = normalizedCXQuestionStem(root);
-	/** 超星点击“修改答案”时可能整块替换 .TiMu，旧 root 会变成脱离文档的快照。 */
-	if (targets.length === 0 && root.ownerDocument) {
-		const rootData = root.getAttribute('data');
-		const candidates = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>('.TiMu,.questionLi,.singleQuesId'));
-		const current = candidates.find((candidate) => {
-			if (candidate === root || getCXCompletionTargets(candidate).length === 0) return false;
-			const candidateStem = normalizedCXQuestionStem(candidate);
-			return (
-				(questionStem && candidateStem && (candidateStem.includes(questionStem) || questionStem.includes(candidateStem))) ||
-				(!!rootData && candidate.getAttribute('data') === rootData)
-			);
-		});
-		if (current) {
-			activeRoot = current;
-			activeConfiguredTargets = [];
-			targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
-		}
-	}
-	/**
-	 * 已提交/待批阅的章节作业会先渲染为只读答案，并把编辑器隐藏在“修改答案”
-	 * 按钮之后。答题器可能比用户点击按钮更早启动，因此这里主动进入编辑态，
-	 * 等待 UEditor 和其隐藏 textarea 注入后再解析目标。
-	 */
+	const targets = getCXCompletionTargets(root, configuredTargets);
 	if (targets.length === 0) {
-		const editTrigger = Array.from(
-			activeRoot.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
-		).find((element) =>
-			/修改答案|编辑答案|重新作答/.test((element.innerText || (element as HTMLInputElement).value || '').trim())
-		) ||
-			Array.from(
-				activeRoot.ownerDocument.querySelectorAll<HTMLElement>('a,button,input[type="button"],input[type="submit"]')
-			).find((element) =>
-				/修改答案|编辑答案|重新作答/.test((element.innerText || (element as HTMLInputElement).value || '').trim())
-			);
-		if (editTrigger) {
-			editTrigger.click();
-			for (let attempt = 0; attempt < 20; attempt++) {
-				await $.sleep(200);
-				targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
-				if (targets.length === 0 && root.ownerDocument) {
-					const current = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>('.TiMu,.questionLi,.singleQuesId')).find(
-						(candidate) => {
-							if (candidate === activeRoot || getCXCompletionTargets(candidate).length === 0) return false;
-							const candidateStem = normalizedCXQuestionStem(candidate);
-							return !questionStem || !candidateStem || candidateStem.includes(questionStem) || questionStem.includes(candidateStem);
-						}
-					);
-					if (current) {
-						activeRoot = current;
-						activeConfiguredTargets = [];
-						targets = getCXCompletionTargets(activeRoot, activeConfiguredTargets);
-					}
-				}
-				if (targets.length > 0) break;
-			}
-		}
-	}
-	if (targets.length === 0) {
-		if (isCXQuestionReadOnly(activeRoot)) {
-			$console.info('检测到题目为只读且没有可用的修改入口，跳过该题。');
+		if (isCXQuestionReadOnly(root)) {
+			$console.info('检测到题目为只读，等待手动进入修改答案后再运行。');
 			return { finish: true, skipped: true };
 		}
 		throw new Error('已获取主观题/填空题答案，但未找到可填写的编辑框。');
@@ -226,7 +158,7 @@ async function fillCXTextQuestion(
 			if (fillCXCompletionTarget(targets[index], answers[index])) filled++;
 		}
 		if (filled === targets.length) {
-			$el('[onclick*=saveQuestion]', activeRoot)?.click();
+			$el('[onclick*=saveQuestion]', root)?.click();
 			await $.sleep(300);
 			return { finish: true };
 		}
@@ -396,7 +328,7 @@ type Attachment = {
 type Job = {
 	mid: string;
 	attachment: Attachment;
-	func: { (): Promise<void> } | undefined;
+	func: { (): Promise<void | 'await-edit'> } | undefined;
 };
 export const CXProject = Project.create({
 	name: '超星学习通',
@@ -1566,6 +1498,7 @@ export async function study(
 	await $.sleep(3000);
 
 	const searchedJobs: Job[] = [];
+	let chapterRestartPending = false;
 
 	let searching = true;
 
@@ -1587,10 +1520,13 @@ export async function study(
 		// 如果存在任务点
 		if (job && job.func) {
 			try {
-				await job.func();
+				const result = await job.func();
+				if (result === 'await-edit') chapterRestartPending = true;
 			} catch (e) {
 				$console.error('未知错误', e);
 			}
+
+			if (chapterRestartPending) return;
 
 			await $.sleep(1000);
 			await runJobs();
@@ -1610,6 +1546,13 @@ export async function study(
 	};
 
 	await runJobs();
+
+	if (chapterRestartPending) {
+		const msg = '当前章节测试处于只读状态，请先点击题目页面的“修改答案”，再点击 OCS 面板中的“重新答题”。';
+		$message.warn({ content: msg, duration: 0 });
+		$console.info(msg);
+		return;
+	}
 
 	// @ts-ignore
 	top._preChapterId = '';
@@ -1741,84 +1684,6 @@ function searchIFrame(root: Document) {
 		}
 	}
 	return result;
-}
-
-/**
- * Resolve the chapter-test state before starting OCSWorker. Chaoxing renders a
- * submitted test as a read-only answer block and only creates the real editors
- * after the global “修改答案” action replaces the question DOM.
- */
-type CXChapterPreparation =
-	| { state: 'ready'; roots: HTMLElement[] }
-	| { state: 'skip'; roots: HTMLElement[] }
-	| { state: 'retry' };
-
-async function prepareCXChapterRoots(
-	frameWindow: Window,
-	initialRoots: HTMLElement[],
-	afterEdit = false
-): Promise<CXChapterPreparation> {
-	const status = frameWindow.document.querySelector<HTMLElement>('.testTit_status');
-	if (status?.classList.contains('testTit_status_complete') || /已完成/.test(status?.innerText || '')) {
-		$console.info('章节测试已完成，不进入修改答案页面。');
-		return { state: 'skip', roots: [] };
-	}
-
-	const getLiveRoots = () => Array.from(frameWindow.document.querySelectorAll<HTMLElement>('.TiMu'));
-	let roots = getLiveRoots();
-	if (roots.length === 0) roots = initialRoots;
-	const readOnlyRoots = roots.filter(isCXQuestionReadOnly);
-
-	// A normal unfinished page has no edit trigger and should enter the original
-	// answer flow unchanged. Only a submitted/read-only page needs preparation.
-	if (readOnlyRoots.length === 0) return { state: 'ready', roots };
-	if (afterEdit) {
-		const editableRoots = roots.filter((root) => !isCXQuestionReadOnly(root));
-		if (editableRoots.length > 0) return { state: 'ready', roots: editableRoots };
-		$console.warn('重新进入章节答题流程后仍检测到只读题目，跳过当前章节测试。');
-		return { state: 'skip', roots: [] };
-	}
-
-	// The edit link can be injected slightly after the question block. Give it a
-	// short grace period before deciding that a read-only task has no edit path.
-	let editTrigger = findCXEditTrigger(frameWindow.document);
-	for (let attempt = 0; !editTrigger && attempt < 15; attempt++) {
-		await $.sleep(200);
-		editTrigger = findCXEditTrigger(frameWindow.document);
-	}
-
-	if (!editTrigger) {
-		$console.info('检测到章节测试题目为只读且没有修改入口，跳过已保存题目。');
-		return { state: 'skip', roots: roots.filter((root) => !isCXQuestionReadOnly(root)) };
-	}
-
-	$console.info('检测到章节测试存在修改入口，先进入修改答案页面。');
-	editTrigger.click();
-
-	// Clicking “修改答案” replaces .TiMu nodes. Re-query the document instead of
-	// retaining the detached roots captured by searchJob.
-	let editModeReached = false;
-	for (let attempt = 0; attempt < 40; attempt++) {
-		await $.sleep(200);
-		const liveRoots = getLiveRoots();
-		if (liveRoots.length === 0) continue;
-		roots = liveRoots;
-		const editableControl = roots.some(hasCXEditableControls);
-		if (editableControl) {
-			editModeReached = true;
-			break;
-		}
-	}
-
-	if (!editModeReached) {
-		$console.warn('修改答案入口未能确认已进入编辑态，跳过当前章节测试。');
-		return { state: 'skip', roots: [] };
-	}
-
-	// Do not continue with this invocation: the old OCSWorker context may already
-	// contain detached read-only roots. Start a fresh chapter invocation so every
-	// element/title/options lookup happens after Chaoxing's DOM replacement.
-	return { state: 'retry' };
 }
 
 /**
@@ -2167,7 +2032,11 @@ const JobRunner = {
 	/**
 	 * 章节测验
 	 */
-	async chapter(frame: HTMLIFrameElement, options: CommonWorkOptions, afterEdit = false): Promise<void> {
+	async chapter(
+		frame: HTMLIFrameElement,
+		options: CommonWorkOptions,
+		showRestartButton = true
+	): Promise<'completed' | 'await-edit' | 'skipped'> {
 		const {
 			answererWrappers,
 			period,
@@ -2178,7 +2047,8 @@ const JobRunner = {
 			answerSeparators
 		} = options;
 		if (answererWrappers === undefined || answererWrappers.length === 0) {
-			return answerWrapperEmptyWarning(0);
+			await answerWrapperEmptyWarning(0);
+			return 'skipped';
 		}
 
 		$console.info('开始章节测试');
@@ -2187,22 +2057,63 @@ const JobRunner = {
 		const frameWindow = frame.contentWindow!;
 		const frameApi = frameWindow as any;
 		const { TiMu: initialTiMu } = domSearchAll({ TiMu: '.TiMu' }, frameWindow!.document);
-		const preparation = await prepareCXChapterRoots(frameWindow, initialTiMu, afterEdit);
-		if (preparation.state === 'retry') {
-			$console.info('修改答案后重新创建章节答题器。');
-			return JobRunner.chapter(frame, options, true);
-		}
-		if (preparation.state === 'skip' || preparation.roots.length === 0) {
-			$console.info('当前章节测试没有可编辑题目，已跳过。');
-			return;
-		}
-		const TiMu = preparation.roots;
+		let worker: OCSWorker<any> | undefined;
+		let restartRequested = false;
+		let restartEventName: string | undefined;
+		if (showRestartButton) {
+			restartEventName = `cx.chapter.restart.${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}`;
+			if (activeCXChapterRestartEvent) cors.off(activeCXChapterRestartEvent);
+			activeCXChapterRestartEvent = restartEventName;
 
-		// 最大化面板
+			const restartChapter = async () => {
+				if (restartRequested) {
+					return { started: false, message: '重新答题正在处理中，请稍候。' };
+				}
+				const liveRoots = Array.from(frameWindow.document.querySelectorAll<HTMLElement>('.TiMu'));
+				if (liveRoots.filter((root) => !isCXQuestionReadOnly(root)).length === 0) {
+					return {
+						started: false,
+						message: '仍未检测到可填写的编辑框，请先点击题目页面的“修改答案”。'
+					};
+				}
+				restartRequested = true;
+				worker?.emit('close');
+				await $.sleep(100);
+				try {
+					const result = await JobRunner.chapter(frame, options, false);
+					return { started: result !== 'skipped' };
+				} finally {
+					restartRequested = false;
+				}
+			};
+			await cors.on(restartEventName, async () => {
+				try {
+					return await restartChapter();
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					$console.error('手动重新答题失败', error);
+					return { started: false, message: `重新答题失败：${message}` };
+				}
+			});
+		}
+
+		// 章节测试的重新答题按钮与作业/考试控制面板保持一致；它只负责重新检测，
+		// 不会替用户点击超星自己的“修改答案”按钮。
 		CORSUtils.panelNormal();
 		CommonProject.scripts.workResults.methods.init();
-		// 固定显示答题结果面板
-		CORSUtils.pinWorkPanel();
+		await CORSUtils.pinWorkPanel();
+		if (restartEventName) {
+			await CORSUtils.showChapterRestartButton(
+				restartEventName,
+				initialTiMu.length > 0 && initialTiMu.every((root) => isCXQuestionReadOnly(root))
+			);
+		}
+
+		const TiMu = initialTiMu.filter((root) => !isCXQuestionReadOnly(root));
+		if (TiMu.length === 0) {
+			$console.info('当前章节测试没有可编辑题目，等待手动点击“修改答案”后再运行。');
+			return 'await-edit';
+		}
 
 		const chapterTestTaskQuestionTitleTransform = (titles: (HTMLElement | undefined)[]) => {
 			const removed = removeRedundantWords(
@@ -2224,7 +2135,7 @@ const JobRunner = {
 		};
 
 		/** 新建答题器 */
-		const worker = new OCSWorker({
+		const chapterWorker = new OCSWorker({
 			root: TiMu,
 			elements: {
 				title: [
@@ -2401,7 +2312,15 @@ const JobRunner = {
 			}
 		});
 
-		const results = await worker.doWork();
+		worker = chapterWorker;
+		let results;
+		try {
+			results = await chapterWorker.doWork();
+		} catch (error) {
+			if (restartRequested) return 'skipped';
+			throw error;
+		}
+		if (restartRequested) return 'skipped';
 
 		const msg = `答题完成，将等待 ${stopSecondWhenFinish} 秒后进行保存或提交。`;
 		$console.info(msg);
@@ -2409,7 +2328,7 @@ const JobRunner = {
 		await $.sleep(stopSecondWhenFinish * 1000);
 
 		// 处理提交
-		await worker.uploadHandler({
+		await chapterWorker.uploadHandler({
 			type: upload,
 			results,
 			async callback(finishedRate, uploadable) {
@@ -2451,7 +2370,13 @@ const JobRunner = {
 			CORSUtils.panelMinimize();
 		}
 
-		worker.emit('done');
+		chapterWorker.emit('done');
+		if (restartEventName) {
+			await CORSUtils.removeChapterRestartButton(restartEventName);
+			cors.off(restartEventName);
+			if (activeCXChapterRestartEvent === restartEventName) activeCXChapterRestartEvent = undefined;
+		}
+		return 'completed';
 	},
 	/**
 	 * 带音频的PPT
@@ -2602,6 +2527,62 @@ function waitForFaceRecognition() {
 const CORSUtils = {
 	pinWorkPanel: cors.defineTopFunction(() => {
 		CommonProject.scripts.render.methods.pin(CommonProject.scripts.workResults);
+	}),
+	showChapterRestartButton: cors.defineTopFunction((eventName: string, requiresEdit = false) => {
+		let cancelled = false;
+		const install = (attempt = 0) => {
+			if (cancelled || attempt > 40) return;
+			const panel = CommonProject.scripts.workResults.panel;
+			if (!panel) {
+				if (attempt < 20) setTimeout(() => install(attempt + 1), 100);
+				return;
+			}
+
+			if (panel.body.querySelector(`[data-ocs-cx-chapter-restart="${eventName}"]`)) return;
+			panel.body.querySelector('[data-ocs-cx-chapter-restart]')?.parentElement?.remove();
+			const button = $ui.button('🔃重新答题', {
+				className: 'base-style-button',
+				style: { flex: '1', padding: '4px' }
+			});
+			button.title = '请先在题目页面点击“修改答案”，再点击此按钮重新检测题目并答题。';
+			button.setAttribute('data-ocs-cx-chapter-restart', eventName);
+
+			const container = h('div', { style: { margin: '12px 0', display: 'flex', gap: '8px' } }, [
+				button,
+				h('span', requiresEdit ? '请先点击题目页面的“修改答案”' : '重新检测当前页面题目并答题')
+			]);
+			button.onclick = () => {
+				cancelled = true;
+				button.disabled = true;
+				button.value = '⏳重新检测中...';
+				cors.emit(eventName, [], (result) => {
+					if (result?.started) {
+						container.remove();
+						return;
+					}
+					button.disabled = false;
+					button.value = '🔃重新答题';
+					$message.warn({
+						content: result?.message || '仍未检测到可填写的编辑框，请先点击题目页面的“修改答案”。',
+						duration: 5
+					});
+				});
+			};
+			panel.body.append(container);
+			setTimeout(() => {
+				if (!cancelled && !panel.body.querySelector(`[data-ocs-cx-chapter-restart="${eventName}"]`)) {
+					install(attempt + 1);
+				}
+			}, 250);
+		};
+
+		install();
+	}),
+	removeChapterRestartButton: cors.defineTopFunction((eventName: string) => {
+		const button = Array.from(CommonProject.scripts.workResults.panel?.body.querySelectorAll('input') || []).find(
+			(element) => element.getAttribute('data-ocs-cx-chapter-restart') === eventName
+		);
+		button?.parentElement?.remove();
 	}),
 	panelNormal: cors.defineTopFunction(() => {
 		CommonProject.scripts.render.methods.normal();
