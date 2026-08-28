@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from typing import Any
 
@@ -31,12 +32,13 @@ class AnswerRequest(BaseModel):
 
 settings = Settings.from_env()
 engine = OCSResponseEngine(settings)
+logger = logging.getLogger("uvicorn.error")
 app = FastAPI(title="OCS Responses Question Bank", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "HEAD", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -62,6 +64,11 @@ def health() -> dict[str, Any]:
     }
 
 
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+def root_health() -> dict[str, Any]:
+    return health()
+
+
 @app.post("/v1/answer")
 def answer(
     request: AnswerRequest,
@@ -73,8 +80,11 @@ def answer(
         result = engine.answer(request.model_dump())
         return {"code": 1, "message": "ok", **result}
     except ImagePreparationError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+        logger.warning("OCS 题目图片准备失败：%s", error)
+        return {"code": 0, "message": str(error)}
     except RuntimeError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+        logger.error("OCS Responses 答题失败：%s", error)
+        return {"code": 0, "message": str(error)}
     except Exception as error:
-        raise HTTPException(status_code=502, detail=f"Responses 请求失败：{error}") from error
+        logger.exception("OCS Responses 答题发生未预期异常")
+        return {"code": 0, "message": f"Responses 请求失败：{error}"}

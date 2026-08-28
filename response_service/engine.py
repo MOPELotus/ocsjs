@@ -353,9 +353,30 @@ class OCSResponseEngine:
         client = self._client or httpx.Client(timeout=self.settings.request_timeout_seconds)
         close_client = self._client is None
         try:
-            response = client.post(self.settings.responses_url, headers=headers, json=request)
-            response.raise_for_status()
-            raw_answer, confidence = self._parse_response(response.json())
+            try:
+                response = client.post(self.settings.responses_url, headers=headers, json=request)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                response_text = error.response.text.strip()
+                if len(response_text) > 2000:
+                    response_text = response_text[:2000] + "..."
+                detail = response_text or error.response.reason_phrase or "empty response"
+                raise RuntimeError(
+                    f"上游 Responses 返回 HTTP {error.response.status_code}：{detail}"
+                ) from error
+            except httpx.HTTPError as error:
+                raise RuntimeError(f"无法连接上游 Responses：{error}") from error
+
+            try:
+                response_body = response.json()
+            except ValueError as error:
+                preview = response.text.strip()[:2000]
+                raise RuntimeError(f"上游 Responses 返回的不是有效 JSON：{preview or 'empty response'}") from error
+
+            try:
+                raw_answer, confidence = self._parse_response(response_body)
+            except json.JSONDecodeError as error:
+                raise RuntimeError(f"Responses 答案不是有效 JSON：{error}") from error
         finally:
             if close_client:
                 client.close()
