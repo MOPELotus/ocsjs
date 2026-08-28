@@ -48,6 +48,22 @@ uvicorn response_service.app:app \
   --env-file response_service/.env
 ```
 
+上面的反斜杠续行写法适用于 Linux Bash。Windows PowerShell 请使用单行命令：
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn response_service.app:app --host 0.0.0.0 --port 8000 --env-file response_service\.env
+```
+
+Windows 也可以直接使用配套批处理：
+
+```powershell
+.\response_service\install.bat
+notepad .\response_service\.env
+.\response_service\start.bat
+```
+
+`install.bat` 会创建 `.venv`、安装依赖，并只在 `.env` 不存在时从示例复制一份；不会覆盖已经填写的密钥。`start.bat` 会从仓库根目录启动服务。
+
 检查服务：
 
 ```bash
