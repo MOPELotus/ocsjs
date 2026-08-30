@@ -88,6 +88,7 @@ class NormalizedQuestion:
     question_type: str
     title: str
     options: tuple[str, ...]
+    original_options: tuple[str, ...]
     attachments: tuple[Attachment, ...]
     context: Mapping[str, Any]
     standard_ocs: bool
@@ -275,6 +276,7 @@ def normalize_question(payload: Mapping[str, Any]) -> NormalizedQuestion:
         ),
         title=title,
         options=options,
+        original_options=tuple(raw_options),
         attachments=tuple(attachments),
         context=context,
         standard_ocs=standard_ocs,
@@ -494,6 +496,29 @@ class OCSResponseEngine:
                     values.append(text_value)
 
             flatten(answer)
+            if question.question_type in {"single", "multiple", "choice"} and question.original_options:
+                expanded_values: list[str] = []
+                for value in values:
+                    if question.question_type != "single" and re.fullmatch(
+                        r"\s*[A-Z]\s*(?:[,，、#;；|]\s*[A-Z]\s*)+", value.upper()
+                    ):
+                        expanded_values.extend(re.findall(r"[A-Z]", value.upper()))
+                    else:
+                        expanded_values.append(value)
+
+                mapped_values: list[str] = []
+                for value in expanded_values:
+                    matched = re.fullmatch(r"\s*([A-Z])(?:[.、:：)）])?\s*", value, re.IGNORECASE)
+                    if matched:
+                        index = ord(matched.group(1).upper()) - ord("A")
+                        if 0 <= index < len(question.original_options):
+                            mapped_values.append(question.original_options[index])
+                            continue
+                    mapped_values.append(value)
+                values = mapped_values
+                # 精确选项文本可能本身全是英文字母（例如 first/third）。
+                # 映射完成后直接返回，避免后面的纯字母兜底把单词拆成 F#I#R...。
+                return self.settings.answer_separator.join(values)
             answer = self.settings.answer_separator.join(values)
 
         compound_types = {"reader", "reading", "listening", "composite"}

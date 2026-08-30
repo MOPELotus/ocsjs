@@ -161,9 +161,23 @@ class OCSResponseEngineTests(unittest.TestCase):
         client = httpx.Client(transport=httpx.MockTransport(handler))
         engine = OCSResponseEngine(settings(), client=client)
         result = engine.answer({"title": "选择", "options": "甲\n乙\n丙", "type": "multiple"})
-        self.assertEqual(result["answer"], "A#C")
+        self.assertEqual(result["answer"], "甲#丙")
         self.assertEqual(result["confidence"], 0.9)
         client.close()
+
+    def test_stock_ocs_choice_letters_are_mapped_back_to_exact_option_text(self):
+        engine = OCSResponseEngine(settings())
+        single = normalize_question(
+            {"title": "选择", "options": "quiet\nsociable\nunknown", "type": "single"}
+        )
+        multiple = normalize_question(
+            {"title": "多选", "options": "first\nsecond\nthird", "type": "multiple"}
+        )
+
+        self.assertEqual(engine.format_ocs_answer("B", single), "sociable")
+        self.assertEqual(engine.format_ocs_answer(["A", "C"], multiple), "first#third")
+        self.assertEqual(engine.format_ocs_answer("A#C", multiple), "first#third")
+        self.assertEqual(engine.format_ocs_answer("BAD", multiple), "BAD")
 
     def test_stock_ocs_formats_all_upstream_supported_answer_shapes(self):
         engine = OCSResponseEngine(settings())
