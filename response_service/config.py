@@ -38,7 +38,9 @@ class Settings:
             openai_model=os.getenv("OPENAI_MODEL", "").strip(),
             reasoning_effort=effort,
             service_access_token=os.getenv("SERVICE_ACCESS_TOKEN", "").strip(),
-            request_timeout_seconds=max(10.0, float(os.getenv("REQUEST_TIMEOUT_SECONDS", "600"))),
+            # 原版 OCS 4.0 的题库超时设置上限为 180 秒。默认留出 10 秒给
+            # 服务端序列化和网络传输，避免浏览器先超时而上游请求仍继续运行。
+            request_timeout_seconds=max(10.0, float(os.getenv("REQUEST_TIMEOUT_SECONDS", "170"))),
             image_timeout_seconds=max(3.0, float(os.getenv("IMAGE_TIMEOUT_SECONDS", "30"))),
             max_images=max(1, int(os.getenv("MAX_IMAGES", "24"))),
             max_image_bytes=max(1024, int(os.getenv("MAX_IMAGE_BYTES", str(12 * 1024 * 1024)))),

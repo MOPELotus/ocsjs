@@ -19,6 +19,44 @@ IMAGE_DATA_PATTERN = re.compile(
     r"^data:(image/[a-z0-9.+-]+);base64,([a-z0-9+/=\r\n]+)$", re.IGNORECASE
 )
 
+_EXTENDED_OCS_FIELDS = {
+    "option_items",
+    "images",
+    "attachments",
+    "material",
+    "subquestions",
+    "shared_options",
+    "matching_groups",
+    "native_type",
+    "blank_count",
+    "underline_count",
+}
+
+_QUESTION_TYPE_ALIASES = {
+    "singlechoice": "single",
+    "single_choice": "single",
+    "单选": "single",
+    "单选题": "single",
+    "multiplechoice": "multiple",
+    "multiple_choice": "multiple",
+    "多选": "multiple",
+    "多选题": "multiple",
+    "judgment": "judgement",
+    "truefalse": "judgement",
+    "true_false": "judgement",
+    "判断": "judgement",
+    "判断题": "judgement",
+    "fillblank": "completion",
+    "fill_blank": "completion",
+    "填空": "completion",
+    "填空题": "completion",
+    "简答": "completion",
+    "简答题": "completion",
+}
+
+_CORRECT_WORDS = {"true", "t", "yes", "1", "对", "是", "正确", "√"}
+_INCORRECT_WORDS = {"false", "f", "no", "0", "错", "否", "错误", "×", "x"}
+
 
 def _sniff_image_mime(content: bytes) -> str:
     if content.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -52,6 +90,7 @@ class NormalizedQuestion:
     options: tuple[str, ...]
     attachments: tuple[Attachment, ...]
     context: Mapping[str, Any]
+    standard_ocs: bool
 
 
 def _option_label(index: int) -> str:
@@ -80,6 +119,26 @@ def _normalize_blanks(value: str) -> str:
         return marker
 
     return BLANK_PATTERN.sub(replace, value)
+
+
+def _normalize_question_type(value: Any, options: Sequence[str]) -> str:
+    raw_type = str(value or "").strip().casefold()
+    raw_type = _QUESTION_TYPE_ALIASES.get(raw_type, raw_type)
+    if raw_type not in {"", "unknown", "undefined", "null", "none"}:
+        return raw_type
+
+    if options:
+        normalized_options = {
+            re.sub(r"[\s、,，;；:：.．()（）]", "", option).casefold()
+            for option in options
+        }
+        judgement_words = _CORRECT_WORDS | _INCORRECT_WORDS
+        if len(options) == 2 and normalized_options.issubset(judgement_words):
+            return "judgement"
+        # 原版 OCS 的其它平台不一定都能稳定提供 type。保留一个不预设
+        # 单选/多选的选择题类型，让模型按题意返回一个或多个选项字母。
+        return "choice"
+    return "completion"
 
 
 def _incoming_attachments(value: Any) -> list[Attachment]:
@@ -205,12 +264,20 @@ def normalize_question(payload: Mapping[str, Any]) -> NormalizedQuestion:
         _normalize_blanks(mark_urls(option, f"选项 {_option_label(index)} "))
         for index, option in enumerate(raw_options)
     )
+    standard_ocs = not any(
+        key in payload and payload.get(key) not in (None, "", [], {})
+        for key in _EXTENDED_OCS_FIELDS
+    )
     return NormalizedQuestion(
-        question_type=str(payload.get("type") or payload.get("question_type") or "unknown").strip().casefold(),
+        question_type=_normalize_question_type(
+            payload.get("type") or payload.get("question_type"),
+            options,
+        ),
         title=title,
         options=options,
         attachments=tuple(attachments),
         context=context,
+        standard_ocs=standard_ocs,
     )
 
 
@@ -293,7 +360,17 @@ class OCSResponseEngine:
             if blank_count
             else "填空/主观题若只有一个作答区，answer 直接返回可填写正文；有多个作答区才返回顺序数组"
         )
-        shape_hint = {
+        standard_shape_hint = {
+            "single": "单选题 answer 返回选项字母，例如 A",
+            "multiple": "多选题 answer 返回选项字母数组，例如 [\"A\", \"C\"]",
+            "choice": "选择题按题意返回一个选项字母，或在多选时返回选项字母数组",
+            "judgement": "判断题 answer 只返回 正确 或 错误",
+            "completion": completion_hint,
+            "line": "连线题 answer 返回按左侧项目顺序排列的一维字符串数组",
+            "fill": "完形填空 answer 返回各小题选项字母的一维顺序数组",
+            "reader": "阅读理解 answer 返回各小题答案的一维顺序数组；选择子题使用选项字母",
+        }.get(question.question_type, "answer 只返回字符串或一维字符串数组")
+        extended_shape_hint = {
             "single": "单选题 answer 返回选项字母，例如 A",
             "multiple": "多选题 answer 返回选项字母数组，例如 [\"A\", \"C\"]",
             "evaluation": "测评选择题 answer 返回选项字母数组，例如 [\"A\", \"C\"]",
@@ -318,13 +395,23 @@ class OCSResponseEngine:
             "oral": "口语题需要录音作答，answer 返回空字符串",
             "oral_evaluation": "口语测评需要录音作答，answer 返回空字符串",
         }.get(question.question_type, "按题目要求返回字符串、数组或保留对应关系的对象")
-        instructions = (
-            "你是 OCS 的课程题目答题服务。只输出 JSON 对象 "
-            "{\"answer\": ..., \"confidence\": 0到1}，不要解释、不要 Markdown。"
-            "必须严格依据附件前的对应标签判断图片属于题干、材料还是某个选项。"
-            "[BLANK_n] 表示第 n 个挖空，[UNDERLINE]...[/UNDERLINE] 表示原文下划线，答案必须保持顺序和对应关系。"
-            f"{shape_hint}。主观题 answer 只放可直接填写的正文。"
-        )
+        if question.standard_ocs:
+            instructions = (
+                "你是原版 OCS 的课程题目答题服务。只输出 JSON 对象 "
+                "{\"answer\": ..., \"confidence\": 0到1}，不要解释、不要 Markdown。"
+                "原版 OCS 只提供题干、换行分隔的选项和基础题型，不要假设存在额外 DOM 结构。"
+                "若服务端从题干或选项 URL 下载到了图片，必须依据附件前的题干/选项标签判断对应关系。"
+                "answer 只能是字符串或一维字符串数组；不得返回嵌套对象。"
+                f"{standard_shape_hint}。主观题 answer 只放可直接填写的正文。"
+            )
+        else:
+            instructions = (
+                "你是 OCS 的课程题目答题服务。只输出 JSON 对象 "
+                "{\"answer\": ..., \"confidence\": 0到1}，不要解释、不要 Markdown。"
+                "必须严格依据附件前的对应标签判断图片属于题干、材料还是某个选项。"
+                "[BLANK_n] 表示第 n 个挖空，[UNDERLINE]...[/UNDERLINE] 表示原文下划线，答案必须保持顺序和对应关系。"
+                f"{extended_shape_hint}。主观题 answer 只放可直接填写的正文。"
+            )
         user_payload = {
             "question_type": question.question_type,
             "title": question.title,
@@ -381,6 +468,34 @@ class OCSResponseEngine:
         return decoded.get("answer"), max(0.0, min(1.0, float(confidence)))
 
     def format_ocs_answer(self, answer: Any, question: NormalizedQuestion) -> str:
+        if question.standard_ocs:
+            values: list[str] = []
+
+            def flatten(value: Any) -> None:
+                if value is None:
+                    return
+                if isinstance(value, Mapping):
+                    if "pairs" in value:
+                        flatten(value["pairs"])
+                        return
+                    for key in ("answer", "options", "text", "right", "value", "option", "content"):
+                        if key in value:
+                            flatten(value[key])
+                            return
+                    for item in value.values():
+                        flatten(item)
+                    return
+                if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+                    for item in value:
+                        flatten(item)
+                    return
+                text_value = str(value).strip()
+                if text_value:
+                    values.append(text_value)
+
+            flatten(answer)
+            answer = self.settings.answer_separator.join(values)
+
         compound_types = {"reader", "reading", "listening", "composite"}
         if isinstance(answer, Mapping):
             if "options" in answer:
@@ -418,10 +533,14 @@ class OCSResponseEngine:
             matched = re.fullmatch(r"\s*([A-Z])(?:[.、:：)）])?\s*", text, re.IGNORECASE)
             if matched:
                 return matched.group(1).upper()
-        if question.question_type in {"multiple", "evaluation"}:
+        if question.question_type in {"multiple", "evaluation", "choice"}:
             letters = re.findall(r"[A-Z]", text.upper())
             if letters and re.fullmatch(r"[\sA-Z,，、#;；|]+", text.upper()):
                 return self.settings.answer_separator.join(dict.fromkeys(letters))
+        if question.question_type in {"fill", "reader", "line"}:
+            letters = re.findall(r"[A-Z]", text.upper())
+            if letters and re.fullmatch(r"[\sA-Z,，、#;；|]+", text.upper()):
+                return self.settings.answer_separator.join(letters)
         if question.question_type == "judgement":
             lowered = text.casefold()
             if lowered in {"true", "t", "yes", "1", "对", "是", "正确", "√"}:

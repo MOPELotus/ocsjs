@@ -13,24 +13,8 @@
     "data": {
       "title": "${title}",
       "options": "${options}",
-      "option_items": {
-        "handler": "return (env) => Array.isArray(env.option_items) ? env.option_items : []"
-      },
-      "type": "${type}",
-      "material": "${material}",
-      "subquestions": {
-        "handler": "return (env) => Array.isArray(env.subquestions) ? env.subquestions : []"
-      },
-      "shared_options": {
-        "handler": "return (env) => Array.isArray(env.shared_options) ? env.shared_options : []"
-      },
-      "matching_groups": {
-        "handler": "return (env) => env.matching_groups || null"
-      },
-      "native_type": "${native_type}",
-      "blank_count": "${blank_count}",
-      "underline_count": "${underline_count}"
+      "type": "${type}"
     },
-    "handler": "return (res) => res.code === 1 ? [res.question, res.answer, { confidence: res.confidence, model: res.model, warnings: res.warnings }] : [res.message || 'Responses AI 题库请求失败', undefined]"
+    "handler": "return (res) => res.code === 1 ? [res.question, res.answer] : [res.message || 'Responses AI 题库请求失败', undefined]"
   }
 ]

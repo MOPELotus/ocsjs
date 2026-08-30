@@ -35,6 +35,31 @@ def settings(**overrides):
 
 
 class OCSResponseEngineTests(unittest.TestCase):
+    def test_stock_ocs_payload_uses_only_standard_fields(self):
+        engine = OCSResponseEngine(settings())
+        request, question, warnings = engine.build_request(
+            {
+                "title": "Which one is correct?",
+                "options": "first\nsecond\nthird",
+                "type": "single",
+            }
+        )
+
+        self.assertTrue(question.standard_ocs)
+        self.assertEqual(question.question_type, "single")
+        self.assertIn("原版 OCS", request["instructions"])
+        self.assertNotIn("UNDERLINE", request["instructions"])
+        self.assertEqual(warnings, [])
+
+    def test_stock_ocs_missing_type_is_inferred_without_forcing_single(self):
+        choice = normalize_question({"title": "选择", "options": "甲\n乙\n丙"})
+        judgement = normalize_question({"title": "判断", "options": "正确\n错误"})
+        subjective = normalize_question({"title": "简述原因"})
+
+        self.assertEqual(choice.question_type, "choice")
+        self.assertEqual(judgement.question_type, "judgement")
+        self.assertEqual(subjective.question_type, "completion")
+
     def test_normalize_labels_title_options_and_blanks(self):
         question = normalize_question(
             {
@@ -140,6 +165,25 @@ class OCSResponseEngineTests(unittest.TestCase):
         self.assertEqual(result["confidence"], 0.9)
         client.close()
 
+    def test_stock_ocs_formats_all_upstream_supported_answer_shapes(self):
+        engine = OCSResponseEngine(settings())
+
+        cases = [
+            ("single", "b", "B"),
+            ("multiple", ["a", "c"], "A#C"),
+            ("choice", ["b", "d"], "B#D"),
+            ("judgement", "true", "正确"),
+            ("completion", ["第一空", "第二空"], "第一空#第二空"),
+            ("line", [{"left": "甲", "right": "B"}, {"left": "乙", "right": "A"}], "B#A"),
+            ("fill", ["A", "C", "B"], "A#C#B"),
+            ("reader", [{"answer": "a"}, {"answer": "a"}], "A#A"),
+        ]
+        for question_type, answer, expected in cases:
+            with self.subTest(question_type=question_type):
+                question = normalize_question({"title": "题目", "type": question_type})
+                self.assertTrue(question.standard_ocs)
+                self.assertEqual(engine.format_ocs_answer(answer, question), expected)
+
     def test_line_pairs_are_flattened_in_left_side_order(self):
         engine = OCSResponseEngine(settings())
         question = normalize_question({"title": "连线", "type": "line"})
@@ -191,7 +235,13 @@ class OCSResponseEngineTests(unittest.TestCase):
 
     def test_compound_nested_answers_stay_json_for_browser_binding(self):
         engine = OCSResponseEngine(settings())
-        question = normalize_question({"title": "阅读", "type": "reading"})
+        question = normalize_question(
+            {
+                "title": "阅读",
+                "type": "reading",
+                "subquestions": [{"title": "子题 1"}, {"title": "子题 2"}, {"title": "子题 3"}],
+            }
+        )
         answer = engine.format_ocs_answer(
             [{"answer": "A"}, {"answer": ["B", "D"]}, {"answer": "正文"}],
             question,

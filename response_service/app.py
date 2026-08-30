@@ -33,7 +33,7 @@ class AnswerRequest(BaseModel):
 settings = Settings.from_env()
 engine = OCSResponseEngine(settings)
 logger = logging.getLogger("uvicorn.error")
-app = FastAPI(title="OCS Responses Question Bank", version="1.0.0")
+app = FastAPI(title="OCS Responses Question Bank", version="1.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
